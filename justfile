@@ -56,6 +56,26 @@ test-cov threshold="80":
     --cov-report xml:coverage.xml \
     --cov-fail-under={{threshold}}
 
+[group('test')]
+[doc("Run the same checks as CI locally")]
+run-ci:
+  uv sync --frozen
+  PYTHONPATH=backend uv run pytest backend/tests \
+    --cov=backend/app_template \
+    --cov-report=xml:coverage.xml \
+    --cov-report=term-missing \
+    --cov-fail-under=80
+  uv run ruff format --check backend
+  uv run ruff check backend
+  PYTHONPATH=backend uv run mypy backend/app_template
+  cd frontend && npm ci
+  cd frontend && npm run lint
+  cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run build
+
+[group('test')]
+[doc("Alias for run-ci")]
+ci-local: run-ci
+
 # ─────────────────────────────────────────────────────────────
 # Linting & Formatting
 # ─────────────────────────────────────────────────────────────

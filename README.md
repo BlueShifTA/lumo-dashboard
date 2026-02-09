@@ -68,6 +68,7 @@ just run-backend  # Start FastAPI dev server
 just run-frontend # Start Next.js dev server
 just test         # Run backend tests
 just test-cov 80  # Run tests with 80% coverage threshold
+just run-ci       # Run CI-equivalent checks locally
 just lint         # Run all linters
 just typecheck    # Run mypy
 just docker-build # Build Docker images
@@ -83,6 +84,9 @@ just test
 
 # Run with coverage
 just test-cov 80
+
+# Run the same checks as GitHub Actions CI locally
+just run-ci
 ```
 
 ## 🔧 Configuration
