@@ -1,0 +1,1 @@
+"""App Template - FastAPI Backend."""

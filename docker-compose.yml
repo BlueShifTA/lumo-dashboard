@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────
+# Docker Compose - Development
+# ─────────────────────────────────────────────────────────────
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: devops/backend.dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=true
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: devops/frontend.dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+# ─────────────────────────────────────────────────────────────
+# Optional: Add database service as needed
+# ─────────────────────────────────────────────────────────────
+#  postgres:
+#    image: postgres:16-alpine
+#    environment:
+#      POSTGRES_USER: app
+#      POSTGRES_PASSWORD: secret
+#      POSTGRES_DB: app_db
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    ports:
+#      - "5432:5432"
+
+#volumes:
+#  postgres_data:
