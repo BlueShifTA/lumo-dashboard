@@ -12,19 +12,37 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/processes", tags=["processes"])
 
 LEROBOT_BIN = "/home/nvidia/miniforge3/envs/lerobot/bin"
-FOLLOWER_PORT = "/dev/ttyACM1"
-LEADER_PORT = "/dev/ttyACM0"
 
-TELEOP_CMD = [
-    f"{LEROBOT_BIN}/lerobot-teleoperate",
-    "--robot.type=so101_follower",
-    f"--robot.port={FOLLOWER_PORT}",
-    "--robot.id=beluga_follower",
-    "--teleop.type=so101_leader",
-    f"--teleop.port={LEADER_PORT}",
-    "--teleop.id=beluga_leader",
-    "--display_data=false",
-]
+
+def _teleop_cmd() -> list[str]:
+    from lumo_dashboard.core.config import get_leader_port, get_follower_port
+    return [
+        f"{LEROBOT_BIN}/lerobot-teleoperate",
+        "--robot.type=so101_follower",
+        f"--robot.port={get_follower_port()}",
+        "--robot.id=beluga_follower",
+        "--teleop.type=so101_leader",
+        f"--teleop.port={get_leader_port()}",
+        "--teleop.id=beluga_leader",
+        "--display_data=false",
+    ]
+
+
+def _record_cmd(task: str, num_episodes: int, repo_id: str) -> list[str]:
+    from lumo_dashboard.core.config import get_leader_port, get_follower_port
+    return [
+        f"{LEROBOT_BIN}/lerobot-record",
+        "--robot.type=so101_follower",
+        f"--robot.port={get_follower_port()}",
+        "--robot.id=beluga_follower",
+        "--teleop.type=so101_leader",
+        f"--teleop.port={get_leader_port()}",
+        "--teleop.id=beluga_leader",
+        f"--dataset.repo_id={repo_id}",
+        f"--dataset.num_episodes={num_episodes}",
+        f"--dataset.single_task={task}",
+        "--display_data=false",
+    ]
 
 
 class ManagedProcess:
@@ -119,7 +137,7 @@ def all_status():
 @router.post("/teleop/start")
 def teleop_start():
     try:
-        _teleop.start(TELEOP_CMD)
+        _teleop.start(_teleop_cmd())
         return {"ok": True, "pid": _teleop._proc.pid}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -133,21 +151,8 @@ def teleop_stop():
 
 @router.post("/record/start")
 def record_start(req: RecordRequest):
-    cmd = [
-        f"{LEROBOT_BIN}/lerobot-record",
-        "--robot.type=so101_follower",
-        f"--robot.port={FOLLOWER_PORT}",
-        "--robot.id=beluga_follower",
-        "--teleop.type=so101_leader",
-        f"--teleop.port={LEADER_PORT}",
-        "--teleop.id=beluga_leader",
-        f"--dataset.repo_id={req.repo_id}",
-        f"--dataset.num_episodes={req.num_episodes}",
-        f"--dataset.single_task={req.task}",
-        "--display_data=false",
-    ]
     try:
-        _record.start(cmd)
+        _record.start(_record_cmd(req.task, req.num_episodes, req.repo_id))
         return {"ok": True, "pid": _record._proc.pid}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

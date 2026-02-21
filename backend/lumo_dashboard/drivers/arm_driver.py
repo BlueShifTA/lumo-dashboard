@@ -138,10 +138,22 @@ class ArmDriver:
     """Dual-arm monitor: leader + follower."""
 
     def __init__(self):
-        self.leader = SingleArmMonitor("leader", "/dev/ttyACM0", "leader")
-        self.follower = SingleArmMonitor("follower", "/dev/ttyACM1", "follower")
+        from lumo_dashboard.core.config import get_leader_port, get_follower_port
+        self.leader = SingleArmMonitor("leader", get_leader_port(), "leader")
+        self.follower = SingleArmMonitor("follower", get_follower_port(), "follower")
         self.leader.start()
         self.follower.start()
+
+    def set_ports(self, leader_port: str, follower_port: str):
+        """Reconnect arms on new ports."""
+        if self.leader.port != leader_port:
+            self.leader.stop()
+            self.leader = SingleArmMonitor("leader", leader_port, "leader")
+            self.leader.start()
+        if self.follower.port != follower_port:
+            self.follower.stop()
+            self.follower = SingleArmMonitor("follower", follower_port, "follower")
+            self.follower.start()
 
     def get_status(self) -> dict:
         """Legacy single-arm status — returns follower for backwards compat."""

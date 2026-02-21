@@ -100,6 +100,8 @@ export default function Dashboard() {
   const [restCamConnected, setRestCamConnected] = useState(false);
   const [camRunning, setCamRunning] = useState(true);
   const [procs, setProcs] = useState({ teleop: { running: false, last_line: "" }, record: { running: false, last_line: "" } });
+  const [leaderPort, setLeaderPort] = useState("/dev/ttyACM0");
+  const [followerPort, setFollowerPort] = useState("/dev/ttyACM1");
   const [recordTask, setRecordTask] = useState("Pick and place");
   const [recordEpisodes, setRecordEpisodes] = useState(10);
   const [recordRepoId, setRecordRepoId] = useState("beluga-orin/demo");
@@ -221,6 +223,23 @@ export default function Dashboard() {
       if (r.ok) setCamMode(next);
     } catch {}
     setModeLoading(false);
+  }
+
+  // Load port config on mount
+  useEffect(() => {
+    fetch("/api/config").then(r => r.json()).then(d => {
+      if (d.leader_port) setLeaderPort(d.leader_port);
+      if (d.follower_port) setFollowerPort(d.follower_port);
+    }).catch(() => {});
+  }, []);
+
+  async function applyPorts() {
+    if (leaderPort === followerPort) return;
+    await fetch("/api/config/ports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leader_port: leaderPort, follower_port: followerPort }),
+    }).catch(() => {});
   }
 
   // Poll process status every 2s
@@ -528,6 +547,32 @@ export default function Dashboard() {
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
             {anyArmConnected ? "Arms ready" : "Arms offline"}
           </span>
+        </div>
+
+        {/* Port Config Row */}
+        <div style={{ gridColumn: "1 / -1", background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, minWidth: 60 }}>PORTS</span>
+          {[
+            { label: "🦾 Leader", value: leaderPort, set: setLeaderPort },
+            { label: "🤖 Follower", value: followerPort, set: setFollowerPort },
+          ].map(({ label, value, set }) => (
+            <label key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <span style={{ color: "var(--text-muted)" }}>{label}</span>
+              <select value={value} onChange={e => set(e.target.value)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "#111", color: "var(--text)", fontSize: 12, cursor: "pointer" }}>
+                {["/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyUSB0", "/dev/ttyUSB1"].map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <button
+            onClick={applyPorts}
+            disabled={leaderPort === followerPort}
+            style={{ padding: "5px 14px", borderRadius: 6, border: "1px solid var(--border)", background: leaderPort === followerPort ? "#111" : "#0d2a1a", color: leaderPort === followerPort ? "#555" : "var(--success)", cursor: leaderPort === followerPort ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+          >
+            Apply
+          </button>
+          {leaderPort === followerPort && <span style={{ fontSize: 11, color: "#ef4444" }}>⚠ ports must differ</span>}
         </div>
 
         {/* Control Panel — full width */}
