@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [wsState, setWsState] = useState("connecting");
   const [camMode, setCamMode] = useState("rgb");
   const [modeLoading, setModeLoading] = useState(false);
+  const [restCamConnected, setRestCamConnected] = useState(false);
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -124,12 +125,21 @@ export default function Dashboard() {
     return () => wsRef.current?.close();
   }, []);
 
-  // Fetch camera mode on load
+  // Poll camera mode + status every 5s (REST fallback — independent of WebSocket)
   useEffect(() => {
-    fetch("/api/camera/mode")
-      .then((r) => r.json())
-      .then((d) => setCamMode(d.mode))
-      .catch(() => {});
+    function pollCamera() {
+      fetch("/api/camera/mode")
+        .then((r) => r.json())
+        .then((d) => setCamMode(d.mode))
+        .catch(() => {});
+      fetch("/api/camera/status")
+        .then((r) => r.json())
+        .then((d) => setRestCamConnected(d.connected === true))
+        .catch(() => setRestCamConnected(false));
+    }
+    pollCamera();
+    const id = setInterval(pollCamera, 5000);
+    return () => clearInterval(id);
   }, []);
 
   async function toggleCamMode() {
@@ -150,7 +160,7 @@ export default function Dashboard() {
   const arm = telemetry?.arm;
   const cam = telemetry?.camera;
   const armConnected = arm?.connected ?? false;
-  const camConnected = cam?.connected ?? false;
+  const camConnected = (cam?.connected ?? false) || restCamConnected;
 
   return (
     <div
