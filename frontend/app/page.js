@@ -99,6 +99,7 @@ export default function Dashboard() {
   const [modeLoading, setModeLoading] = useState(false);
   const [restCamConnected, setRestCamConnected] = useState(false);
   const [streamKey, setStreamKey] = useState(0);
+  const [camRunning, setCamRunning] = useState(true);
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -135,13 +136,29 @@ export default function Dashboard() {
         .catch(() => {});
       fetch("/api/camera/status")
         .then((r) => r.json())
-        .then((d) => setRestCamConnected(d.connected === true))
+        .then((d) => {
+          setRestCamConnected(d.connected === true);
+          setCamRunning(d.connected === true);
+        })
         .catch(() => setRestCamConnected(false));
     }
     pollCamera();
     const id = setInterval(pollCamera, 5000);
     return () => clearInterval(id);
   }, []);
+
+  async function toggleCamera() {
+    const endpoint = camRunning ? "/api/camera/stop" : "/api/camera/start";
+    try {
+      const r = await fetch(endpoint, { method: "POST" });
+      if (r.ok) {
+        const next = !camRunning;
+        setCamRunning(next);
+        setRestCamConnected(next);
+        if (next) setTimeout(() => setStreamKey((k) => k + 1), 500);
+      }
+    } catch {}
+  }
 
   async function toggleCamMode() {
     const next = camMode === "rgb" ? "ir" : "rgb";
@@ -318,36 +335,57 @@ export default function Dashboard() {
               {camConnected ? "● LIVE" : "● OFFLINE"}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span
-                style={{
-                  fontSize: 11,
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  background: camMode === "ir" ? "#1a0d2a" : "#0d1a2a",
-                  color: camMode === "ir" ? "#c084fc" : "#60a5fa",
-                  border: `1px solid ${camMode === "ir" ? "#4a1a6a" : "#1a3a6a"}`,
-                  fontWeight: 600,
-                  letterSpacing: 0.5,
-                }}
-              >
-                {camMode === "ir" ? "🌙 IR" : "☀️ RGB"}
-              </span>
+              {/* On/Off toggle */}
               <button
-                onClick={toggleCamMode}
-                disabled={modeLoading}
+                onClick={toggleCamera}
                 style={{
                   fontSize: 11,
                   padding: "3px 10px",
                   borderRadius: 4,
-                  background: "#111",
-                  color: modeLoading ? "#555" : "var(--text)",
-                  border: "1px solid var(--border)",
-                  cursor: modeLoading ? "wait" : "pointer",
-                  fontWeight: 600,
+                  background: camRunning ? "#1a0505" : "#051a05",
+                  color: camRunning ? "#ef4444" : "var(--success)",
+                  border: `1px solid ${camRunning ? "#4a1a1a" : "#1a4a1a"}`,
+                  cursor: "pointer",
+                  fontWeight: 700,
                 }}
               >
-                {modeLoading ? "..." : camMode === "ir" ? "→ RGB" : "→ IR"}
+                {camRunning ? "⏹ OFF" : "▶ ON"}
               </button>
+              {/* IR/RGB mode */}
+              {camRunning && (
+                <>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: camMode === "ir" ? "#1a0d2a" : "#0d1a2a",
+                      color: camMode === "ir" ? "#c084fc" : "#60a5fa",
+                      border: `1px solid ${camMode === "ir" ? "#4a1a6a" : "#1a3a6a"}`,
+                      fontWeight: 600,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {camMode === "ir" ? "🌙 IR" : "☀️ RGB"}
+                  </span>
+                  <button
+                    onClick={toggleCamMode}
+                    disabled={modeLoading}
+                    style={{
+                      fontSize: 11,
+                      padding: "3px 10px",
+                      borderRadius: 4,
+                      background: "#111",
+                      color: modeLoading ? "#555" : "var(--text)",
+                      border: "1px solid var(--border)",
+                      cursor: modeLoading ? "wait" : "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {modeLoading ? "..." : camMode === "ir" ? "→ RGB" : "→ IR"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <img

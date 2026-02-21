@@ -57,3 +57,15 @@ def set_mode(req: ModeRequest):
         raise HTTPException(status_code=400, detail="mode must be 'rgb' or 'ir'")
     get_camera().set_mode(req.mode)
     return {"mode": req.mode}
+
+
+@router.post("/start")
+def camera_start():
+    get_camera().start()
+    return {"running": True}
+
+
+@router.post("/stop")
+def camera_stop():
+    get_camera().stop()
+    return {"running": False}
