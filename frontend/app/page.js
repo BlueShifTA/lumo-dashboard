@@ -98,6 +98,7 @@ export default function Dashboard() {
   const [camMode, setCamMode] = useState("rgb");
   const [modeLoading, setModeLoading] = useState(false);
   const [restCamConnected, setRestCamConnected] = useState(false);
+  const [streamKey, setStreamKey] = useState(0);
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -151,7 +152,10 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: next }),
       });
-      if (r.ok) setCamMode(next);
+      if (r.ok) {
+        setCamMode(next);
+        setStreamKey((k) => k + 1); // force stream reload with new mode
+      }
     } catch {}
     setModeLoading(false);
   }
@@ -347,7 +351,8 @@ export default function Dashboard() {
             </div>
           </div>
           <img
-            src="/api/camera/stream"
+            key={streamKey}
+            src={`/api/camera/stream?t=${streamKey}`}
             alt="Camera feed"
             style={{
               width: "100%",
@@ -355,8 +360,9 @@ export default function Dashboard() {
               objectFit: "contain",
               display: "block",
             }}
-            onError={(e) => {
-              e.target.style.display = "none";
+            onError={() => {
+              // Auto-retry after 2s on stream error
+              setTimeout(() => setStreamKey((k) => k + 1), 2000);
             }}
           />
         </div>
