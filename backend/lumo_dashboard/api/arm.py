@@ -44,7 +44,37 @@ def arm_stop():
 
 @router.get("/calibration")
 def arm_calibration():
-    return get_arm().calibration()
+    """Return joint min/max in degrees and 0-100 for gripper, from calibration files."""
+    import json
+    from pathlib import Path
+
+    CAL_ROOT = Path.home() / ".cache/huggingface/lerobot/calibration"
+    MAX_RES = 4095  # STS3215
+
+    result = {}
+    for role, cal_path in [
+        ("follower", CAL_ROOT / "robots/so_follower/beluga_follower_arm.json"),
+        ("leader",   CAL_ROOT / "teleoperators/so_leader/beluga_leader_arm.json"),
+    ]:
+        if not cal_path.exists():
+            result[role] = {}
+            continue
+        cal = json.loads(cal_path.read_text())
+        joints = {}
+        for name, data in cal.items():
+            rmin, rmax = data["range_min"], data["range_max"]
+            if name == "gripper":
+                joints[name] = {"min": 0.0, "max": 100.0, "unit": "%"}
+            else:
+                mid = (rmin + rmax) / 2
+                half = (rmax - rmin) / 2 * 360 / MAX_RES
+                joints[name] = {
+                    "min": round(-half, 1),
+                    "max": round(half, 1),
+                    "unit": "deg",
+                }
+        result[role] = joints
+    return result
 
 
 @router.post("/follower/move")

@@ -105,7 +105,8 @@ export default function Dashboard() {
   const [recordTask, setRecordTask] = useState("Pick and place");
   const [recordEpisodes, setRecordEpisodes] = useState(10);
   const [recordRepoId, setRecordRepoId] = useState("beluga-orin/demo");
-  const [jointTargets, setJointTargets] = useState({});
+  const [jointLimits, setJointLimits] = useState({});
+  const [dragState, setDragState] = useState({}); // {jointName: value} while dragging
   const wsRef = useRef(null);
   const canvasRef = useRef(null);
   const feedActiveRef = useRef(true);
@@ -225,6 +226,14 @@ export default function Dashboard() {
     setModeLoading(false);
   }
 
+  // Load calibration limits on mount
+  useEffect(() => {
+    fetch("/api/arm/calibration")
+      .then(r => r.json())
+      .then(d => setJointLimits(d.follower || {}))
+      .catch(() => {});
+  }, []);
+
   // Load port config on mount
   useEffect(() => {
     fetch("/api/config").then(r => r.json()).then(d => {
@@ -276,6 +285,8 @@ export default function Dashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ joint, angle: parseFloat(angle) }),
     }).catch(() => {});
+    // Clear drag state — slider reverts to live position
+    setDragState(s => { const n = {...s}; delete n[joint]; return n; });
   }
 
   const sys = telemetry?.system;
@@ -629,25 +640,36 @@ export default function Dashboard() {
             </div>
             {JOINTS.map(name => {
               const cur = follower?.joints?.[name]?.pos;
-              const isGripper = name === "gripper";
-              const min = isGripper ? 0 : -180;
-              const max = isGripper ? 100 : 180;
-              const val = jointTargets[name] ?? (cur ?? 0);
+              const lim = jointLimits[name];
+              const min = lim?.min ?? (name === "gripper" ? 0 : -180);
+              const max = lim?.max ?? (name === "gripper" ? 100 : 180);
+              const unit = name === "gripper" ? "%" : "°";
+              // While dragging use drag value; otherwise use live motor position
+              const isDragging = name in dragState;
+              const val = isDragging ? dragState[name] : (cur ?? min);
               return (
                 <div key={name} style={{ marginBottom: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-muted)", marginBottom: 2 }}>
                     <span>{JOINT_LABELS[name]}</span>
-                    <span style={{ fontFamily: "monospace", color: followerConnected ? "var(--primary)" : "#555" }}>{cur != null ? `${cur.toFixed(1)}°` : "--"}</span>
+                    <span style={{ fontFamily: "monospace", color: followerConnected ? "var(--primary)" : "#555" }}>
+                      {isDragging
+                        ? <span style={{ color: "#f59e0b" }}>{parseFloat(val).toFixed(1)}{unit}</span>
+                        : cur != null ? `${cur.toFixed(1)}${unit}` : "--"
+                      }
+                    </span>
                   </div>
                   <input
                     type="range" min={min} max={max} step={0.5}
                     value={val}
                     disabled={!followerConnected}
-                    onChange={e => setJointTargets(t => ({ ...t, [name]: parseFloat(e.target.value) }))}
+                    onChange={e => setDragState(s => ({ ...s, [name]: parseFloat(e.target.value) }))}
                     onMouseUp={e => moveJoint(name, e.target.value)}
                     onTouchEnd={e => moveJoint(name, e.target.value)}
                     style={{ width: "100%", accentColor: followerConnected ? "var(--primary)" : "#555", opacity: followerConnected ? 1 : 0.4 }}
                   />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#444", marginTop: 1 }}>
+                    <span>{min}{unit}</span><span>{max}{unit}</span>
+                  </div>
                 </div>
               );
             })}
