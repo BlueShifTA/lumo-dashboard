@@ -101,9 +101,12 @@ export default function Dashboard() {
   const [recordRepoId, setRecordRepoId] = useState("beluga-orin/demo");
   const [calibration, setCalibration] = useState({ leader: {}, follower: {} });
   const [dragState, setDragState] = useState({}); // {jointName: value} while dragging
+  const [motorSpeed, setMotorSpeed] = useState(30);   // 0-100 %
+  const [motorAccel, setMotorAccel] = useState(10);   // 0-254
   const wsRef = useRef(null);
   const canvasRef = useRef(null);
   const feedActiveRef = useRef(true);
+  const lastSendRef = useRef({}); // {jointName: timestampMs} throttle tracking
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -272,15 +275,33 @@ export default function Dashboard() {
     }
   }
 
-  async function moveJoint(joint, angle) {
+  async function moveJoint(joint, angle, isFinal = false) {
     if (!followerConnected) return;
     await fetch("/api/arm/follower/move", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ joint, angle: parseFloat(angle) }),
+      body: JSON.stringify({
+        joint,
+        angle: parseFloat(angle),
+        speed: motorSpeed,
+        acceleration: motorAccel,
+      }),
     }).catch(() => {});
-    // Clear drag state — slider reverts to live position
-    setDragState(s => { const n = {...s}; delete n[joint]; return n; });
+    if (isFinal) {
+      // Clear drag state on release — slider reverts to live position
+      setDragState(s => { const n = {...s}; delete n[joint]; return n; });
+    }
+  }
+
+  // Throttled drag handler — sends every 120ms max while sliding
+  function onJointDrag(joint, value) {
+    setDragState(s => ({ ...s, [joint]: parseFloat(value) }));
+    const now = Date.now();
+    const last = lastSendRef.current[joint] || 0;
+    if (now - last >= 120) {
+      lastSendRef.current[joint] = now;
+      moveJoint(joint, value, false);
+    }
   }
 
   const sys = telemetry?.system;
@@ -628,10 +649,39 @@ export default function Dashboard() {
 
           {/* Joint Control Card */}
           <div style={{ background: "var(--card-bg)", border: `1px solid ${followerConnected ? "var(--border)" : "#2a1a1a"}`, borderRadius: 12, padding: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1 }}>🎛 Joint Control</h3>
               <span style={{ fontSize: 11, color: followerConnected ? "var(--success)" : "#555" }}>{followerConnected ? "● live" : "○ offline"}</span>
             </div>
+
+            {/* Speed & Acceleration Controls */}
+            <div style={{ background: "#0a0a0a", border: "1px solid #222", borderRadius: 8, padding: "8px 10px", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 10, color: "var(--text-muted)", minWidth: 52 }}>Speed</span>
+                <input
+                  type="range" min={0} max={100} step={5}
+                  value={motorSpeed}
+                  onChange={e => setMotorSpeed(parseInt(e.target.value))}
+                  style={{ flex: 1, accentColor: "var(--primary)" }}
+                />
+                <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--primary)", minWidth: 32, textAlign: "right" }}>
+                  {motorSpeed}%
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 10, color: "var(--text-muted)", minWidth: 52 }}>Accel</span>
+                <input
+                  type="range" min={0} max={50} step={1}
+                  value={motorAccel}
+                  onChange={e => setMotorAccel(parseInt(e.target.value))}
+                  style={{ flex: 1, accentColor: "#f59e0b" }}
+                />
+                <span style={{ fontFamily: "monospace", fontSize: 11, color: "#f59e0b", minWidth: 32, textAlign: "right" }}>
+                  {motorAccel}
+                </span>
+              </div>
+            </div>
+
             {JOINTS.map(name => {
               const cur = follower?.joints?.[name]?.pos;
               const lim = calibration.follower?.[name];
@@ -656,10 +706,10 @@ export default function Dashboard() {
                     type="range" min={min} max={max} step={0.5}
                     value={val}
                     disabled={!followerConnected}
-                    onChange={e => setDragState(s => ({ ...s, [name]: parseFloat(e.target.value) }))}
-                    onMouseUp={e => moveJoint(name, e.target.value)}
-                    onTouchEnd={e => moveJoint(name, e.target.value)}
-                    style={{ width: "100%", accentColor: followerConnected ? "var(--primary)" : "#555", opacity: followerConnected ? 1 : 0.4 }}
+                    onChange={e => onJointDrag(name, e.target.value)}
+                    onMouseUp={e => moveJoint(name, e.target.value, true)}
+                    onTouchEnd={e => moveJoint(name, e.target.value, true)}
+                    style={{ width: "100%", accentColor: followerConnected ? (isDragging ? "#f59e0b" : "var(--primary)") : "#555", opacity: followerConnected ? 1 : 0.4 }}
                   />
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#444", marginTop: 1 }}>
                     <span>{min}{unit}</span><span>{max}{unit}</span>

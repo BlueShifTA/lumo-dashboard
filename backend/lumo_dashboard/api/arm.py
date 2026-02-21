@@ -15,6 +15,8 @@ class MoveRequest(BaseModel):
 class JointMoveRequest(BaseModel):
     joint: str
     angle: float
+    speed: int = 30        # 0–100 (% of max); default 30 for safety
+    acceleration: int = 10  # 0–254; lower = smoother ramp; default 10
 
 
 @router.get("/status")
@@ -97,6 +99,22 @@ def _get_joint_limits() -> dict:
     return limits
 
 
+def _speed_to_goal_velocity(speed_pct: int) -> int:
+    """Map UI speed % (0–100) to STS3215 Goal_Velocity raw value.
+
+    STS3215 Goal_Velocity:
+      0       = use maximum motor speed (no limit)
+      1–3000  = steps/s limit; ~50 steps/s is very slow, ~2000 is fast
+
+    We invert: speed_pct 0 → very slow (50), speed_pct 100 → no limit (0).
+    At 30% default the motor moves at ~350 steps/s — safe and visible.
+    """
+    if speed_pct >= 100:
+        return 0  # max speed, no limit
+    # Linear map: 0% → 50, 100% → 0 (via clamp at 99%)
+    return max(1, round(50 + (99 - speed_pct) / 99 * 1950))
+
+
 @router.post("/follower/move")
 def follower_joint_move(req: JointMoveRequest):
     arm = get_arm()
@@ -112,13 +130,32 @@ def follower_joint_move(req: JointMoveRequest):
 
     try:
         bus = arm.follower._arm  # FeetechMotorsBus
-        # Set Goal_Position = current position for ALL joints first,
-        # then update the target joint — prevents snap-to-memory on torque enable
+        joint_names = list(bus.motors.keys())
+
+        # 1. Read current positions for all joints
         cur = bus.sync_read("Present_Position")
         goal = {name: cur[name] for name in cur}
         goal[req.joint] = angle
+
+        # 2. Apply speed + acceleration to all joints so motion is smooth
+        goal_vel = _speed_to_goal_velocity(req.speed)
+        accel = max(0, min(254, req.acceleration))
+        vel_dict  = {name: goal_vel for name in joint_names}
+        accel_dict = {name: accel   for name in joint_names}
+        bus.sync_write("Goal_Velocity", vel_dict)
+        bus.sync_write("Acceleration",  accel_dict)
+
+        # 3. Enable torque and write target position
         bus.sync_write("Goal_Position", goal)
         bus.enable_torque()
-        return {"ok": True, "joint": req.joint, "angle": angle, "clamped": angle != req.angle}
+
+        return {
+            "ok": True,
+            "joint": req.joint,
+            "angle": angle,
+            "clamped": angle != req.angle,
+            "goal_velocity": goal_vel,
+            "acceleration": accel,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
