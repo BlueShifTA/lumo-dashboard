@@ -178,9 +178,12 @@ export default function Dashboard() {
   }
 
   const sys = telemetry?.system;
-  const arm = telemetry?.arm;
   const cam = telemetry?.camera;
-  const armConnected = arm?.connected ?? false;
+  const leader = telemetry?.leader;
+  const follower = telemetry?.follower;
+  const leaderConnected = leader?.connected ?? false;
+  const followerConnected = follower?.connected ?? false;
+  const anyArmConnected = leaderConnected || followerConnected;
   const camConnected = (cam?.connected ?? false) || restCamConnected;
 
   return (
@@ -210,7 +213,8 @@ export default function Dashboard() {
           <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.5 }}>
             🦾 Lumo Dashboard
           </span>
-          <StatusDot connected={armConnected} label="ARM" />
+          <StatusDot connected={leaderConnected} label="LEADER" />
+          <StatusDot connected={followerConnected} label="FOLLOWER" />
           <StatusDot connected={camConnected} label="CAM" />
         </div>
         <div
@@ -253,48 +257,39 @@ export default function Dashboard() {
           gap: 16,
         }}
       >
-        {/* Joint Panel */}
-        <div
-          style={{
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            padding: 20,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              marginBottom: 16,
-            }}
-          >
-            Robot Arm — Joint Telemetry
-          </h2>
-          {JOINTS.map((name) => (
-            <JointRow key={name} name={name} data={arm?.joints?.[name]} />
-          ))}
-          {!armConnected && (
+        {/* Dual Arm Panel */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {[
+            { key: "leader", label: "Leader Arm", port: "/dev/ttyACM0", data: leader, connected: leaderConnected },
+            { key: "follower", label: "Follower Arm", port: "/dev/ttyACM1", data: follower, connected: followerConnected },
+          ].map(({ key, label, port, data, connected }) => (
             <div
+              key={key}
               style={{
-                marginTop: 16,
-                padding: 12,
-                borderRadius: 8,
-                background: "#1a1008",
-                border: "1px solid #3a2a08",
-                color: "#888",
-                fontSize: 13,
-                textAlign: "center",
+                background: "var(--card-bg)",
+                border: `1px solid ${connected ? "var(--border)" : "#2a1a1a"}`,
+                borderRadius: 12,
+                padding: 16,
               }}
             >
-              ⚠️ Arm not connected — port /dev/ttyACM1
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1, margin: 0 }}>
+                  🦾 {label}
+                </h2>
+                <span style={{
+                  fontSize: 11, padding: "2px 8px", borderRadius: 4,
+                  background: connected ? "#0d2a1a" : "#1a0d0d",
+                  color: connected ? "var(--success)" : "#ef4444",
+                  border: `1px solid ${connected ? "#1a4a2a" : "#4a1a1a"}`,
+                }}>
+                  {connected ? `● ${port}` : `○ offline`}
+                </span>
+              </div>
+              {JOINTS.map((name) => (
+                <JointRow key={name} name={name} data={data?.joints?.[name]} />
+              ))}
             </div>
-          )}
+          ))}
         </div>
 
         {/* Camera Feed */}
@@ -454,7 +449,7 @@ export default function Dashboard() {
             🛑 EMERGENCY STOP
           </button>
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            {armConnected ? "Arm ready" : "Arm offline — commands queued"}
+            {anyArmConnected ? "Arms ready" : "Arms offline"}
           </span>
         </div>
       </div>

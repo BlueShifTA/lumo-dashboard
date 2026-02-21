@@ -15,6 +15,20 @@ try:
     from gi.repository import Gst
     Gst.init(None)
     GST_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    # gi not in this Python env — try system dist-packages (Jetson)
+    import sys
+    sys.path.insert(0, "/usr/lib/python3/dist-packages")
+    try:
+        import gi
+        gi.require_version("Gst", "1.0")
+        from gi.repository import Gst
+        Gst.init(None)
+        GST_AVAILABLE = True
+        log.info("GStreamer loaded from system dist-packages")
+    except Exception as e2:
+        log.warning(f"GStreamer not available: {e2}")
+        GST_AVAILABLE = False
 except Exception as e:
     log.warning(f"GStreamer not available: {e}")
     GST_AVAILABLE = False

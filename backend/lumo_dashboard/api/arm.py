@@ -18,6 +18,11 @@ def arm_status():
     return get_arm().get_status()
 
 
+@router.get("/dual")
+def arm_dual():
+    return get_arm().get_dual_status()
+
+
 @router.post("/move")
 def arm_move(req: MoveRequest):
     return get_arm().move(req.joints, req.speed)

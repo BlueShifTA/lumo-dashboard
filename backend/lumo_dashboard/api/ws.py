@@ -23,14 +23,17 @@ def _read_temp(zone: int = 0) -> float:
 
 
 def _build_telemetry() -> dict:
-    arm = get_arm().get_status()
+    dual = get_arm().get_dual_status()
     cam = get_camera().status()
     return {
         "ts": datetime.now(timezone.utc).isoformat(),
         "arm": {
-            "connected": arm["connected"],
-            "joints": arm["joints"],
+            # legacy single-arm field (follower) for backwards compat
+            "connected": dual["follower"]["connected"],
+            "joints": dual["follower"]["joints"],
         },
+        "leader": dual["leader"],
+        "follower": dual["follower"],
         "camera": {
             "connected": cam["connected"],
             "fps": cam["fps"],
