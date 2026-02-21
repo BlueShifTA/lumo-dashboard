@@ -46,6 +46,7 @@ class SingleArmMonitor:
         self._joints = _empty_joints()
         self._connected = False
         self._running = False
+        self._paused = False
         self._thread = None
         self._arm = None
 
@@ -53,12 +54,28 @@ class SingleArmMonitor:
         if self._running:
             return
         self._running = True
+        self._paused = False
         self._thread = threading.Thread(target=self._loop, daemon=True, name=f"arm-{self.name}")
         self._thread.start()
 
     def stop(self):
         self._running = False
+        self._paused = False
         self._disconnect()
+
+    def pause(self):
+        """Release serial port without stopping the monitoring thread (e.g. before teleop)."""
+        self._paused = True
+        self._disconnect()
+        with self._lock:
+            self._connected = False
+            self._joints = _empty_joints()
+        log.info(f"[{self.name}] Paused (serial port released)")
+
+    def resume(self):
+        """Re-enable monitoring after teleop/record exits."""
+        self._paused = False
+        log.info(f"[{self.name}] Resumed (will reconnect)")
 
     def _connect(self):
         try:
@@ -140,6 +157,9 @@ class SingleArmMonitor:
     def _loop(self):
         retry_delay = 3.0
         while self._running:
+            if self._paused:
+                time.sleep(0.5)
+                continue
             if not self._connected:
                 if not LEROBOT_AVAILABLE:
                     time.sleep(5)
@@ -179,6 +199,16 @@ class ArmDriver:
         self.follower = SingleArmMonitor("follower", get_follower_port(), "follower")
         self.leader.start()
         self.follower.start()
+
+    def pause_all(self):
+        """Release serial ports so external processes (teleop/record) can use them."""
+        self.leader.pause()
+        self.follower.pause()
+
+    def resume_all(self):
+        """Resume monitoring after external process exits."""
+        self.leader.resume()
+        self.follower.resume()
 
     def set_ports(self, leader_port: str, follower_port: str):
         """Reconnect arms on new ports."""
