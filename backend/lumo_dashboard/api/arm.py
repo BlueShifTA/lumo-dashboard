@@ -12,6 +12,10 @@ class MoveRequest(BaseModel):
     joints: dict[str, float] = {}
     speed: int = 50
 
+class JointMoveRequest(BaseModel):
+    joint: str
+    angle: float
+
 
 @router.get("/status")
 def arm_status():
@@ -41,3 +45,15 @@ def arm_stop():
 @router.get("/calibration")
 def arm_calibration():
     return get_arm().calibration()
+
+
+@router.post("/follower/move")
+def follower_joint_move(req: JointMoveRequest):
+    arm = get_arm()
+    if not arm.follower._connected or arm.follower._arm is None:
+        raise HTTPException(status_code=503, detail="Follower arm not connected")
+    try:
+        arm.follower._arm.bus.sync_write("Goal_Position", {req.joint: req.angle})
+        return {"ok": True, "joint": req.joint, "angle": req.angle}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

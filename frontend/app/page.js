@@ -99,6 +99,11 @@ export default function Dashboard() {
   const [modeLoading, setModeLoading] = useState(false);
   const [restCamConnected, setRestCamConnected] = useState(false);
   const [camRunning, setCamRunning] = useState(true);
+  const [procs, setProcs] = useState({ teleop: { running: false, last_line: "" }, record: { running: false, last_line: "" } });
+  const [recordTask, setRecordTask] = useState("Pick and place");
+  const [recordEpisodes, setRecordEpisodes] = useState(10);
+  const [recordRepoId, setRecordRepoId] = useState("beluga-orin/demo");
+  const [jointTargets, setJointTargets] = useState({});
   const wsRef = useRef(null);
   const canvasRef = useRef(null);
   const feedActiveRef = useRef(true);
@@ -216,6 +221,42 @@ export default function Dashboard() {
       if (r.ok) setCamMode(next);
     } catch {}
     setModeLoading(false);
+  }
+
+  // Poll process status every 2s
+  useEffect(() => {
+    function poll() {
+      fetch("/api/processes/status").then(r => r.json()).then(setProcs).catch(() => {});
+    }
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function toggleTeleop() {
+    const ep = procs.teleop?.running ? "/api/processes/teleop/stop" : "/api/processes/teleop/start";
+    await fetch(ep, { method: "POST" }).catch(() => {});
+  }
+
+  async function toggleRecord() {
+    if (procs.record?.running) {
+      await fetch("/api/processes/record/stop", { method: "POST" }).catch(() => {});
+    } else {
+      await fetch("/api/processes/record/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: recordTask, num_episodes: recordEpisodes, repo_id: recordRepoId }),
+      }).catch(() => {});
+    }
+  }
+
+  async function moveJoint(joint, angle) {
+    if (!followerConnected) return;
+    await fetch("/api/arm/follower/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ joint, angle: parseFloat(angle) }),
+    }).catch(() => {});
   }
 
   const sys = telemetry?.system;
@@ -487,6 +528,85 @@ export default function Dashboard() {
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
             {anyArmConnected ? "Arms ready" : "Arms offline"}
           </span>
+        </div>
+
+        {/* Control Panel — full width */}
+        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+
+          {/* Teleop Card */}
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1 }}>🎮 Teleoperation</h3>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: procs.teleop?.running ? "var(--success)" : "#555", display: "inline-block", boxShadow: procs.teleop?.running ? "0 0 6px var(--success)" : "none" }} />
+            </div>
+            <button
+              onClick={toggleTeleop}
+              style={{ width: "100%", padding: "10px", borderRadius: 8, border: `1px solid ${procs.teleop?.running ? "var(--danger)" : "var(--border)"}`, background: procs.teleop?.running ? "#1a0505" : "#0d2a1a", color: procs.teleop?.running ? "var(--danger)" : "var(--success)", cursor: "pointer", fontSize: 14, fontWeight: 700, marginBottom: 8 }}
+            >
+              {procs.teleop?.running ? "⏹ Stop Teleop" : "▶ Start Teleop"}
+            </button>
+            <p style={{ margin: 0, fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {procs.teleop?.last_line || (procs.teleop?.running ? "Running..." : "Idle")}
+            </p>
+          </div>
+
+          {/* Record Card */}
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1 }}>📼 Record Dataset</h3>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: procs.record?.running ? "#f59e0b" : "#555", display: "inline-block", boxShadow: procs.record?.running ? "0 0 6px #f59e0b" : "none" }} />
+            </div>
+            {!procs.record?.running && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                <input value={recordTask} onChange={e => setRecordTask(e.target.value)} placeholder="Task description" style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "#111", color: "var(--text)", fontSize: 12 }} />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input type="number" value={recordEpisodes} onChange={e => setRecordEpisodes(parseInt(e.target.value))} min={1} max={100} style={{ width: 60, padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "#111", color: "var(--text)", fontSize: 12 }} />
+                  <input value={recordRepoId} onChange={e => setRecordRepoId(e.target.value)} placeholder="user/dataset" style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "#111", color: "var(--text)", fontSize: 12 }} />
+                </div>
+              </div>
+            )}
+            <button
+              onClick={toggleRecord}
+              style={{ width: "100%", padding: "10px", borderRadius: 8, border: `1px solid ${procs.record?.running ? "var(--danger)" : "#f59e0b"}`, background: procs.record?.running ? "#1a0505" : "#1a1200", color: procs.record?.running ? "var(--danger)" : "#f59e0b", cursor: "pointer", fontSize: 14, fontWeight: 700, marginBottom: 8 }}
+            >
+              {procs.record?.running ? "⏹ Stop Recording" : "▶ Start Recording"}
+            </button>
+            <p style={{ margin: 0, fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {procs.record?.last_line || (procs.record?.running ? "Recording..." : "Idle")}
+            </p>
+          </div>
+
+          {/* Joint Control Card */}
+          <div style={{ background: "var(--card-bg)", border: `1px solid ${followerConnected ? "var(--border)" : "#2a1a1a"}`, borderRadius: 12, padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1 }}>🎛 Joint Control</h3>
+              <span style={{ fontSize: 11, color: followerConnected ? "var(--success)" : "#555" }}>{followerConnected ? "● live" : "○ offline"}</span>
+            </div>
+            {JOINTS.map(name => {
+              const cur = follower?.joints?.[name]?.pos;
+              const isGripper = name === "gripper";
+              const min = isGripper ? 0 : -180;
+              const max = isGripper ? 100 : 180;
+              const val = jointTargets[name] ?? (cur ?? 0);
+              return (
+                <div key={name} style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-muted)", marginBottom: 2 }}>
+                    <span>{JOINT_LABELS[name]}</span>
+                    <span style={{ fontFamily: "monospace", color: followerConnected ? "var(--primary)" : "#555" }}>{cur != null ? `${cur.toFixed(1)}°` : "--"}</span>
+                  </div>
+                  <input
+                    type="range" min={min} max={max} step={0.5}
+                    value={val}
+                    disabled={!followerConnected}
+                    onChange={e => setJointTargets(t => ({ ...t, [name]: parseFloat(e.target.value) }))}
+                    onMouseUp={e => moveJoint(name, e.target.value)}
+                    onTouchEnd={e => moveJoint(name, e.target.value)}
+                    style={{ width: "100%", accentColor: followerConnected ? "var(--primary)" : "#555", opacity: followerConnected ? 1 : 0.4 }}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
