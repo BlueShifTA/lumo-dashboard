@@ -98,7 +98,7 @@ export default function Dashboard() {
   const [camMode, setCamMode] = useState("rgb");
   const [modeLoading, setModeLoading] = useState(false);
   const [restCamConnected, setRestCamConnected] = useState(false);
-  const [streamKey, setStreamKey] = useState(0);
+  const [streamKey, setStreamKey] = useState(() => Date.now());
   const [camRunning, setCamRunning] = useState(true);
   const wsRef = useRef(null);
 
