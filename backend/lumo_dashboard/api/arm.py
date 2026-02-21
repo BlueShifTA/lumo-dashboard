@@ -83,7 +83,14 @@ def follower_joint_move(req: JointMoveRequest):
     if not arm.follower._connected or arm.follower._arm is None:
         raise HTTPException(status_code=503, detail="Follower arm not connected")
     try:
-        arm.follower._arm.bus.sync_write("Goal_Position", {req.joint: req.angle})
+        bus = arm.follower._arm  # FeetechMotorsBus
+        # Set Goal_Position = current position for ALL joints first,
+        # then update the target joint — prevents snap-to-memory on torque enable
+        cur = bus.sync_read("Present_Position")
+        goal = {name: cur[name] for name in cur}
+        goal[req.joint] = req.angle
+        bus.sync_write("Goal_Position", goal)
+        bus.enable_torque()
         return {"ok": True, "joint": req.joint, "angle": req.angle}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

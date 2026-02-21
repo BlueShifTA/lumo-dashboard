@@ -58,20 +58,56 @@ class SingleArmMonitor:
 
     def stop(self):
         self._running = False
+        self._disconnect()
 
     def _connect(self):
         try:
-            if self.arm_type == "leader":
-                config = SOLeaderTeleopConfig(port=self.port, use_degrees=True)
-                arm = SOLeader(config)
-            else:
-                config = SOFollowerRobotConfig(port=self.port)
-                arm = SOFollower(config)
+            # Use FeetechMotorsBus directly — read-only monitoring.
+            # Never call configure() or enable_torque() so the arm stays
+            # in whatever torque/position state it was already in.
+            from lerobot.motors import Motor, MotorNormMode
+            from lerobot.motors.feetech import FeetechMotorsBus
+            import json
+            from pathlib import Path
 
-            arm.connect(calibrate=False)
-            self._arm = arm
+            norm = MotorNormMode.DEGREES
+            motors = {
+                "shoulder_pan":  Motor(1, "sts3215", norm),
+                "shoulder_lift": Motor(2, "sts3215", norm),
+                "elbow_flex":    Motor(3, "sts3215", norm),
+                "wrist_flex":    Motor(4, "sts3215", norm),
+                "wrist_roll":    Motor(5, "sts3215", norm),
+                "gripper":       Motor(6, "sts3215", MotorNormMode.RANGE_0_100),
+            }
+
+            # Load calibration file so positions are normalized correctly
+            CAL_ROOT = Path.home() / ".cache/huggingface/lerobot/calibration"
+            if self.arm_type == "leader":
+                cal_path = CAL_ROOT / "teleoperators/so_leader/beluga_leader_arm.json"
+            else:
+                cal_path = CAL_ROOT / "robots/so_follower/beluga_follower_arm.json"
+
+            calibration = None
+            if cal_path.exists():
+                from lerobot.motors import MotorCalibration
+                raw_cal = json.loads(cal_path.read_text())
+                calibration = {
+                    name: MotorCalibration(
+                        id=data["id"],
+                        drive_mode=data["drive_mode"],
+                        homing_offset=data["homing_offset"],
+                        range_min=data["range_min"],
+                        range_max=data["range_max"],
+                    )
+                    for name, data in raw_cal.items()
+                }
+
+            bus = FeetechMotorsBus(port=self.port, motors=motors, calibration=calibration)
+            # Connect with handshake to verify motors are present — no torque/config changes
+            bus.connect(handshake=True)
+            self._arm = bus
             self._connected = True
-            log.info(f"[{self.name}] Connected on {self.port}")
+            log.info(f"[{self.name}] Connected (read-only) on {self.port}")
             return True
         except Exception as e:
             log.warning(f"[{self.name}] Connect failed: {e}")
@@ -81,20 +117,25 @@ class SingleArmMonitor:
 
     def _read_joints(self):
         try:
-            if self.arm_type == "leader":
-                raw = self._arm.get_action()
-            else:
-                raw = self._arm.get_observation()
-            # raw = {"shoulder_pan.pos": 12.3, ...}
+            # Read Present_Position directly — no torque or Goal_Position writes
+            raw = self._arm.sync_read("Present_Position")
             joints = {}
             for name in JOINT_NAMES:
-                key = f"{name}.pos"
-                val = raw.get(key)
+                val = raw.get(name)
                 joints[name] = {"pos": round(float(val), 1) if val is not None else None, "load": None}
             return joints
         except Exception as e:
             log.warning(f"[{self.name}] Read error: {e}")
             return None
+
+    def _disconnect(self):
+        try:
+            if self._arm:
+                # disconnect without touching torque — pass disable_torque=False
+                self._arm.disconnect(disable_torque=False)
+        except Exception:
+            pass
+        self._arm = None
 
     def _loop(self):
         retry_delay = 3.0
@@ -111,12 +152,7 @@ class SingleArmMonitor:
             if joints is None:
                 # Read failed — mark disconnected, retry
                 self._connected = False
-                try:
-                    if self._arm:
-                        self._arm.disconnect()
-                except Exception:
-                    pass
-                self._arm = None
+                self._disconnect()
                 with self._lock:
                     self._joints = _empty_joints()
             else:
