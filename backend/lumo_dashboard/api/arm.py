@@ -1,6 +1,6 @@
 """Arm control API endpoints."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from lumo_dashboard.drivers.arm_driver import get_arm
@@ -77,20 +77,48 @@ def arm_calibration():
     return result
 
 
+def _get_joint_limits() -> dict:
+    """Return {joint: (min, max)} from calibration file."""
+    import json
+    from pathlib import Path
+    MAX_RES = 4095
+    cal_path = Path.home() / ".cache/huggingface/lerobot/calibration/robots/so_follower/beluga_follower_arm.json"
+    if not cal_path.exists():
+        return {}
+    cal = json.loads(cal_path.read_text())
+    limits = {}
+    for name, data in cal.items():
+        if name == "gripper":
+            limits[name] = (0.0, 100.0)
+        else:
+            rmin, rmax = data["range_min"], data["range_max"]
+            half = (rmax - rmin) / 2 * 360 / MAX_RES
+            limits[name] = (-half, half)
+    return limits
+
+
 @router.post("/follower/move")
 def follower_joint_move(req: JointMoveRequest):
     arm = get_arm()
     if not arm.follower._connected or arm.follower._arm is None:
         raise HTTPException(status_code=503, detail="Follower arm not connected")
+
+    # Clamp angle to calibrated limits — prevents out-of-range commands
+    limits = _get_joint_limits()
+    angle = req.angle
+    if req.joint in limits:
+        lo, hi = limits[req.joint]
+        angle = max(lo, min(hi, angle))
+
     try:
         bus = arm.follower._arm  # FeetechMotorsBus
         # Set Goal_Position = current position for ALL joints first,
         # then update the target joint — prevents snap-to-memory on torque enable
         cur = bus.sync_read("Present_Position")
         goal = {name: cur[name] for name in cur}
-        goal[req.joint] = req.angle
+        goal[req.joint] = angle
         bus.sync_write("Goal_Position", goal)
         bus.enable_torque()
-        return {"ok": True, "joint": req.joint, "angle": req.angle}
+        return {"ok": True, "joint": req.joint, "angle": angle, "clamped": angle != req.angle}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
