@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "App Template",
-  description: "FastAPI + Next.js Template",
+  title: "Lumo Dashboard",
+  description: "Eco Robot Arm + Camera Dashboard",
 };
 
 export default function RootLayout({ children }) {

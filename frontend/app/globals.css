@@ -4,7 +4,7 @@
   --card-bg: #111;
   --border: #222;
   --text: #eee;
-  --text-muted: #888;
+  --text-muted: #666;
   --primary: #3b82f6;
   --danger: #ef4444;
   --success: #22c55e;
@@ -16,131 +16,18 @@
   padding: 0;
 }
 
+html, body {
+  height: 100%;
+}
+
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text);
-  line-height: 1.5;
-}
-
-.container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-}
-
-h1 {
-  font-size: 1.5rem;
-}
-
-.status {
-  font-size: 0.875rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  background: var(--border);
-}
-
-.status.ok {
-  background: var(--success);
-  color: #000;
-}
-
-.status.error {
-  background: var(--danger);
-}
-
-.card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-h2 {
-  font-size: 1rem;
-  margin-bottom: 1rem;
-  color: var(--text-muted);
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-input {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 0.375rem;
-  padding: 0.625rem 0.75rem;
-  color: var(--text);
-  font-size: 0.875rem;
-}
-
-input:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-button {
-  background: var(--primary);
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  padding: 0.625rem 1rem;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: opacity 0.2s;
+  -webkit-font-smoothing: antialiased;
 }
 
 button:hover {
-  opacity: 0.9;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.delete {
-  background: transparent;
-  color: var(--danger);
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-}
-
-.empty {
-  color: var(--text-muted);
-  text-align: center;
-  padding: 2rem;
-}
-
-.item-list {
-  list-style: none;
-}
-
-.item-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.item-list li:last-child {
-  border-bottom: none;
-}
-
-.item-list p {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
+  opacity: 0.85;
+  transition: opacity 0.1s;
 }
