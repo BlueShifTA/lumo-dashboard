@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 const JOINTS = [
   "shoulder_pan",
@@ -98,9 +98,10 @@ export default function Dashboard() {
   const [camMode, setCamMode] = useState("rgb");
   const [modeLoading, setModeLoading] = useState(false);
   const [restCamConnected, setRestCamConnected] = useState(false);
-  const [streamKey, setStreamKey] = useState(() => Date.now());
   const [camRunning, setCamRunning] = useState(true);
   const wsRef = useRef(null);
+  const canvasRef = useRef(null);
+  const feedActiveRef = useRef(true);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -125,6 +126,49 @@ export default function Dashboard() {
 
     connect();
     return () => wsRef.current?.close();
+  }, []);
+
+  // Canvas-based camera feed — fetch snapshots, draw to canvas
+  useEffect(() => {
+    feedActiveRef.current = true;
+    let timeoutId = null;
+
+    async function fetchFrame() {
+      if (!feedActiveRef.current) return;
+      const canvas = canvasRef.current;
+      if (!canvas) { timeoutId = setTimeout(fetchFrame, 100); return; }
+
+      try {
+        const res = await fetch(`/api/camera/snapshot?t=${Date.now()}`, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(2000),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const ctx = canvas.getContext("2d");
+            canvas.width = img.naturalWidth || 640;
+            canvas.height = img.naturalHeight || 480;
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+      } catch {}
+
+      if (feedActiveRef.current) timeoutId = setTimeout(fetchFrame, 67); // ~15fps
+    }
+
+    fetchFrame();
+    return () => {
+      feedActiveRef.current = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   // Poll camera mode + status every 5s (REST fallback — independent of WebSocket)
@@ -155,7 +199,7 @@ export default function Dashboard() {
         const next = !camRunning;
         setCamRunning(next);
         setRestCamConnected(next);
-        if (next) setTimeout(() => setStreamKey((k) => k + 1), 500);
+        feedActiveRef.current = next; // pause/resume canvas loop
       }
     } catch {}
   }
@@ -169,10 +213,7 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: next }),
       });
-      if (r.ok) {
-        setCamMode(next);
-        setStreamKey((k) => k + 1); // force stream reload with new mode
-      }
+      if (r.ok) setCamMode(next);
     } catch {}
     setModeLoading(false);
   }
@@ -383,19 +424,14 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          <img
-            key={streamKey}
-            src={`/api/camera/stream?t=${streamKey}`}
-            alt="Camera feed"
+          <canvas
+            ref={canvasRef}
             style={{
               width: "100%",
               height: "100%",
               objectFit: "contain",
               display: "block",
-            }}
-            onError={() => {
-              // Auto-retry after 2s on stream error
-              setTimeout(() => setStreamKey((k) => k + 1), 2000);
+              background: "#000",
             }}
           />
         </div>

@@ -17,8 +17,10 @@ try:
     GST_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
     # gi not in this Python env — try system dist-packages (Jetson)
+    # Insert temporarily, then remove to avoid contaminating numpy ABI
     import sys
-    sys.path.insert(0, "/usr/lib/python3/dist-packages")
+    _gi_path = "/usr/lib/python3/dist-packages"
+    sys.path.insert(0, _gi_path)
     try:
         import gi
         gi.require_version("Gst", "1.0")
@@ -29,6 +31,12 @@ except (ImportError, ModuleNotFoundError):
     except Exception as e2:
         log.warning(f"GStreamer not available: {e2}")
         GST_AVAILABLE = False
+    finally:
+        # Remove immediately — don't let system packages bleed into lerobot imports
+        try:
+            sys.path.remove(_gi_path)
+        except ValueError:
+            pass
 except Exception as e:
     log.warning(f"GStreamer not available: {e}")
     GST_AVAILABLE = False
