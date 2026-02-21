@@ -40,15 +40,17 @@ function StatusDot({ connected, label }) {
   );
 }
 
-function JointRow({ name, data }) {
+function JointRow({ name, data, limits }) {
   const pos = data?.pos;
   const offline = pos === null || pos === undefined;
+  const min = limits?.min ?? (name === "gripper" ? 0 : -180);
+  const max = limits?.max ?? (name === "gripper" ? 100 : 180);
+  const unit = name === "gripper" ? "%" : "°";
+  const pct = offline ? 50 : Math.round(((pos - min) / (max - min)) * 100);
+
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
         padding: "8px 12px",
         borderRadius: 8,
         background: "var(--card-bg)",
@@ -56,34 +58,26 @@ function JointRow({ name, data }) {
         marginBottom: 6,
       }}
     >
-      <span style={{ color: offline ? "var(--text-muted)" : "var(--text)", fontSize: 14 }}>
-        {JOINT_LABELS[name] || name}
-      </span>
-      <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <span
-          style={{
-            fontFamily: "monospace",
-            fontSize: 16,
-            color: offline ? "var(--text-muted)" : "var(--primary)",
-            minWidth: 60,
-            textAlign: "right",
-          }}
-        >
-          {offline ? "--°" : `${pos.toFixed(1)}°`}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <span style={{ color: offline ? "var(--text-muted)" : "var(--text)", fontSize: 13 }}>
+          {JOINT_LABELS[name] || name}
         </span>
-        <span
-          style={{
-            fontSize: 11,
-            padding: "2px 8px",
-            borderRadius: 4,
-            background: offline ? "#1a1a1a" : "#0d2a1a",
-            color: offline ? "#555" : "var(--success)",
-            border: `1px solid ${offline ? "#333" : "#1a4a2a"}`,
-          }}
-        >
-          {offline ? "OFFLINE" : "ACTIVE"}
+        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontFamily: "monospace", fontSize: 14, color: offline ? "var(--text-muted)" : "var(--primary)", minWidth: 56, textAlign: "right" }}>
+            {offline ? `--${unit}` : `${pos.toFixed(1)}${unit}`}
+          </span>
+          <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: offline ? "#1a1a1a" : "#0d2a1a", color: offline ? "#555" : "var(--success)", border: `1px solid ${offline ? "#333" : "#1a4a2a"}` }}>
+            {offline ? "OFFLINE" : "ACTIVE"}
+          </span>
         </span>
-      </span>
+      </div>
+      {/* Range bar */}
+      <div style={{ position: "relative", height: 4, borderRadius: 2, background: "#1a1a1a" }}>
+        <div style={{ position: "absolute", left: `${Math.max(0, Math.min(100, pct))}%`, top: -3, width: 2, height: 10, borderRadius: 1, background: offline ? "#333" : "var(--primary)", transform: "translateX(-50%)" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", position: "absolute", width: "100%", top: 6, fontSize: 9, color: "#333" }}>
+          <span>{min}{unit}</span><span>{max}{unit}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -105,7 +99,7 @@ export default function Dashboard() {
   const [recordTask, setRecordTask] = useState("Pick and place");
   const [recordEpisodes, setRecordEpisodes] = useState(10);
   const [recordRepoId, setRecordRepoId] = useState("beluga-orin/demo");
-  const [jointLimits, setJointLimits] = useState({});
+  const [calibration, setCalibration] = useState({ leader: {}, follower: {} });
   const [dragState, setDragState] = useState({}); // {jointName: value} while dragging
   const wsRef = useRef(null);
   const canvasRef = useRef(null);
@@ -226,11 +220,11 @@ export default function Dashboard() {
     setModeLoading(false);
   }
 
-  // Load calibration limits on mount
+  // Load calibration limits on mount (both leader + follower)
   useEffect(() => {
     fetch("/api/arm/calibration")
       .then(r => r.json())
-      .then(d => setJointLimits(d.follower || {}))
+      .then(d => setCalibration({ leader: d.leader || {}, follower: d.follower || {} }))
       .catch(() => {});
   }, []);
 
@@ -372,9 +366,9 @@ export default function Dashboard() {
         {/* Dual Arm Panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {[
-            { key: "leader", label: "Leader Arm", port: "/dev/ttyACM0", data: leader, connected: leaderConnected },
-            { key: "follower", label: "Follower Arm", port: "/dev/ttyACM1", data: follower, connected: followerConnected },
-          ].map(({ key, label, port, data, connected }) => (
+            { key: "leader", label: "Leader Arm", port: leaderPort, data: leader, connected: leaderConnected, cal: calibration.leader },
+            { key: "follower", label: "Follower Arm", port: followerPort, data: follower, connected: followerConnected, cal: calibration.follower },
+          ].map(({ key, label, port, data, connected, cal }) => (
             <div
               key={key}
               style={{
@@ -398,7 +392,7 @@ export default function Dashboard() {
                 </span>
               </div>
               {JOINTS.map((name) => (
-                <JointRow key={name} name={name} data={data?.joints?.[name]} />
+                <JointRow key={name} name={name} data={data?.joints?.[name]} limits={cal?.[name]} />
               ))}
             </div>
           ))}
@@ -640,7 +634,7 @@ export default function Dashboard() {
             </div>
             {JOINTS.map(name => {
               const cur = follower?.joints?.[name]?.pos;
-              const lim = jointLimits[name];
+              const lim = calibration.follower?.[name];
               const min = lim?.min ?? (name === "gripper" ? 0 : -180);
               const max = lim?.max ?? (name === "gripper" ? 100 : 180);
               const unit = name === "gripper" ? "%" : "°";
