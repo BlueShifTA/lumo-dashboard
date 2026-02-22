@@ -1,51 +1,58 @@
 """Arm control API endpoints."""
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from lumo_dashboard.drivers.arm_driver import get_arm
+from lumo_dashboard.drivers.arm_driver import DualArmStatus, LegacyArmStatus, get_arm
 
 router = APIRouter(prefix="/arm", tags=["arm"])
 
+JointRange = tuple[float, float]
+JointLimits = dict[str, JointRange]
+CalibrationJoint = dict[str, float | str]
+CalibrationRole = dict[str, CalibrationJoint]
+CalibrationResponse = dict[str, CalibrationRole]
+
 
 class MoveRequest(BaseModel):
-    joints: dict[str, float] = {}
+    joints: dict[str, float] = Field(default_factory=dict)
     speed: int = 50
+
 
 class JointMoveRequest(BaseModel):
     joint: str
     angle: float
-    speed: int = 30        # 0–100 (% of max); default 30 for safety
+    speed: int = 30  # 0–100 (% of max); default 30 for safety
     acceleration: int = 10  # 0–254; lower = smoother ramp; default 10
 
 
 @router.get("/status")
-def arm_status():
+def arm_status() -> LegacyArmStatus:
     return get_arm().get_status()
 
 
 @router.get("/dual")
-def arm_dual():
+def arm_dual() -> DualArmStatus:
     return get_arm().get_dual_status()
 
 
 @router.post("/move")
-def arm_move(req: MoveRequest):
+def arm_move(req: MoveRequest) -> dict[str, object]:
     return get_arm().move(req.joints, req.speed)
 
 
 @router.post("/home")
-def arm_home():
+def arm_home() -> dict[str, object]:
     return get_arm().home()
 
 
 @router.post("/stop")
-def arm_stop():
+def arm_stop() -> dict[str, object]:
     return get_arm().stop()
 
 
 @router.get("/calibration")
-def arm_calibration():
+def arm_calibration() -> CalibrationResponse:
     """Return joint min/max in degrees and 0-100 for gripper, from calibration files."""
     import json
     from pathlib import Path
@@ -53,22 +60,21 @@ def arm_calibration():
     CAL_ROOT = Path.home() / ".cache/huggingface/lerobot/calibration"
     MAX_RES = 4095  # STS3215
 
-    result = {}
+    result: CalibrationResponse = {}
     for role, cal_path in [
         ("follower", CAL_ROOT / "robots/so_follower/beluga_follower_arm.json"),
-        ("leader",   CAL_ROOT / "teleoperators/so_leader/beluga_leader_arm.json"),
+        ("leader", CAL_ROOT / "teleoperators/so_leader/beluga_leader_arm.json"),
     ]:
         if not cal_path.exists():
             result[role] = {}
             continue
         cal = json.loads(cal_path.read_text())
-        joints = {}
+        joints: CalibrationRole = {}
         for name, data in cal.items():
             rmin, rmax = data["range_min"], data["range_max"]
             if name == "gripper":
                 joints[name] = {"min": 0.0, "max": 100.0, "unit": "%"}
             else:
-                mid = (rmin + rmax) / 2
                 half = (rmax - rmin) / 2 * 360 / MAX_RES
                 joints[name] = {
                     "min": round(-half, 1),
@@ -79,16 +85,20 @@ def arm_calibration():
     return result
 
 
-def _get_joint_limits() -> dict:
+def _get_joint_limits() -> JointLimits:
     """Return {joint: (min, max)} from calibration file."""
     import json
     from pathlib import Path
+
     MAX_RES = 4095
-    cal_path = Path.home() / ".cache/huggingface/lerobot/calibration/robots/so_follower/beluga_follower_arm.json"
+    cal_path = (
+        Path.home()
+        / ".cache/huggingface/lerobot/calibration/robots/so_follower/beluga_follower_arm.json"
+    )
     if not cal_path.exists():
         return {}
     cal = json.loads(cal_path.read_text())
-    limits = {}
+    limits: JointLimits = {}
     for name, data in cal.items():
         if name == "gripper":
             limits[name] = (0.0, 100.0)
@@ -116,7 +126,7 @@ def _speed_to_goal_velocity(speed_pct: int) -> int:
 
 
 @router.post("/follower/move")
-def follower_joint_move(req: JointMoveRequest):
+def follower_joint_move(req: JointMoveRequest) -> dict[str, object]:
     arm = get_arm()
     if not arm.follower._connected or arm.follower._arm is None:
         raise HTTPException(status_code=503, detail="Follower arm not connected")
@@ -134,16 +144,21 @@ def follower_joint_move(req: JointMoveRequest):
 
         # 1. Read current positions for all joints
         cur = bus.sync_read("Present_Position")
-        goal = {name: cur[name] for name in cur}
+        goal: dict[str, float] = {}
+        for name in joint_names:
+            value = cur.get(name)
+            if value is None:
+                raise RuntimeError(f"Missing current position for joint: {name}")
+            goal[name] = float(value)
         goal[req.joint] = angle
 
         # 2. Apply speed + acceleration to all joints so motion is smooth
         goal_vel = _speed_to_goal_velocity(req.speed)
         accel = max(0, min(254, req.acceleration))
-        vel_dict  = {name: goal_vel for name in joint_names}
-        accel_dict = {name: accel   for name in joint_names}
+        vel_dict = {name: goal_vel for name in joint_names}
+        accel_dict = {name: accel for name in joint_names}
         bus.sync_write("Goal_Velocity", vel_dict)
-        bus.sync_write("Acceleration",  accel_dict)
+        bus.sync_write("Acceleration", accel_dict)
 
         # 3. Enable torque and write target position
         bus.sync_write("Goal_Position", goal)
@@ -158,4 +173,4 @@ def follower_joint_move(req: JointMoveRequest):
             "acceleration": accel,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

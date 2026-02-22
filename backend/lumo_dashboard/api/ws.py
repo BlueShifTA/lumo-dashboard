@@ -2,16 +2,39 @@
 
 import asyncio
 import json
-from datetime import datetime, timezone
-
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from datetime import UTC, datetime
+from typing import TypedDict
 
 import psutil
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from lumo_dashboard.drivers.arm_driver import get_arm
+from lumo_dashboard.drivers.arm_driver import SingleArmStatus, get_arm
 from lumo_dashboard.drivers.camera_driver import get_camera
 
 router = APIRouter(tags=["telemetry"])
+
+
+class SystemTelemetry(TypedDict):
+    cpu_pct: float
+    mem_pct: float
+    cpu_temp: float
+    gpu_temp: float
+
+
+class CameraTelemetry(TypedDict):
+    connected: bool
+    fps: int
+    width: int
+    height: int
+
+
+class TelemetryPayload(TypedDict):
+    ts: str
+    arm: dict[str, object]
+    leader: SingleArmStatus
+    follower: SingleArmStatus
+    camera: CameraTelemetry
+    system: SystemTelemetry
 
 
 def _read_temp(zone: int = 0) -> float:
@@ -22,11 +45,11 @@ def _read_temp(zone: int = 0) -> float:
         return 0.0
 
 
-def _build_telemetry() -> dict:
+def _build_telemetry() -> TelemetryPayload:
     dual = get_arm().get_dual_status()
     cam = get_camera().status()
     return {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "arm": {
             # legacy single-arm field (follower) for backwards compat
             "connected": dual["follower"]["connected"],
@@ -50,7 +73,7 @@ def _build_telemetry() -> dict:
 
 
 @router.websocket("/ws/telemetry")
-async def telemetry_ws(ws: WebSocket):
+async def telemetry_ws(ws: WebSocket) -> None:
     await ws.accept()
     try:
         while True:

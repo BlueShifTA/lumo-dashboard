@@ -1,0 +1,19 @@
+from collections.abc import Mapping
+
+class FeetechMotorsBus:
+    motors: Mapping[str, object]
+
+    def __init__(
+        self,
+        *,
+        port: str,
+        motors: Mapping[str, object],
+        calibration: object | None = None,
+    ) -> None: ...
+    def connect(self, handshake: bool = True) -> None: ...
+    def disconnect(self, disable_torque: bool = False) -> None: ...
+    def sync_read(self, register: str) -> Mapping[str, float | None]: ...
+    def sync_write(
+        self, register: str, values: Mapping[str, int | float | None]
+    ) -> None: ...
+    def enable_torque(self) -> None: ...

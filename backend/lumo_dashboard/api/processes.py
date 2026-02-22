@@ -1,10 +1,12 @@
 """LeRobot process manager — start/stop/status for teleop and record."""
 
+import logging
+import signal
 import subprocess
 import threading
-import signal
-import logging
 from collections import deque
+from collections.abc import Callable
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -12,10 +14,12 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/processes", tags=["processes"])
 
 LEROBOT_BIN = "/home/nvidia/miniforge3/envs/lerobot/bin"
+OnExitCallback = Callable[[], None]
 
 
 def _teleop_cmd() -> list[str]:
-    from lumo_dashboard.core.config import get_leader_port, get_follower_port
+    from lumo_dashboard.core.config import get_follower_port, get_leader_port
+
     return [
         f"{LEROBOT_BIN}/lerobot-teleoperate",
         "--robot.type=so101_follower",
@@ -29,7 +33,8 @@ def _teleop_cmd() -> list[str]:
 
 
 def _record_cmd(task: str, num_episodes: int, repo_id: str) -> list[str]:
-    from lumo_dashboard.core.config import get_leader_port, get_follower_port
+    from lumo_dashboard.core.config import get_follower_port, get_leader_port
+
     return [
         f"{LEROBOT_BIN}/lerobot-record",
         "--robot.type=so101_follower",
@@ -45,10 +50,11 @@ def _record_cmd(task: str, num_episodes: int, repo_id: str) -> list[str]:
     ]
 
 
-def _arm_resume():
+def _arm_resume() -> None:
     """Resume arm monitoring after a managed process exits."""
     try:
         from lumo_dashboard.drivers.arm_driver import get_arm
+
         get_arm().resume_all()
         log.info("[processes] Arm monitoring resumed")
     except Exception as e:
@@ -60,17 +66,17 @@ class ManagedProcess:
 
     def __init__(self, name: str):
         self.name = name
-        self._proc: subprocess.Popen | None = None
-        self._log: deque = deque(maxlen=50)
+        self._proc: subprocess.Popen[str] | None = None
+        self._log: deque[str] = deque(maxlen=50)
         self._lock = threading.Lock()
-        self._on_exit = None  # callback fired when process exits (success or crash)
+        self._on_exit: OnExitCallback | None = None
 
     @property
     def running(self) -> bool:
         with self._lock:
             return self._proc is not None and self._proc.poll() is None
 
-    def start(self, cmd: list[str], on_exit=None) -> None:
+    def start(self, cmd: list[str], on_exit: OnExitCallback | None = None) -> None:
         if self.running:
             self.stop()
         with self._lock:
@@ -115,7 +121,10 @@ class ManagedProcess:
         proc = self._proc
         if not proc:
             return
-        for line in proc.stdout:
+        stdout = proc.stdout
+        if stdout is None:
+            return
+        for line in stdout:
             line = line.rstrip()
             with self._lock:
                 self._log.append(line)
@@ -129,7 +138,7 @@ class ManagedProcess:
             except Exception as exc:
                 log.warning(f"[{self.name}] on_exit callback failed: {exc}")
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, object]:
         with self._lock:
             pid = self._proc.pid if self._proc else None
             rc = self._proc.poll() if self._proc else None
@@ -155,7 +164,7 @@ _record = ManagedProcess("record")
 
 
 @router.get("/status")
-def all_status():
+def all_status() -> dict[str, dict[str, object]]:
     return {
         "teleop": _teleop.status(),
         "record": _record.status(),
@@ -163,38 +172,48 @@ def all_status():
 
 
 @router.post("/teleop/start")
-def teleop_start():
+def teleop_start() -> dict[str, int | bool]:
     try:
         # Pause arm monitoring so lerobot-teleoperate can open the serial ports
         from lumo_dashboard.drivers.arm_driver import get_arm
+
         get_arm().pause_all()
         _teleop.start(_teleop_cmd(), on_exit=_arm_resume)
-        return {"ok": True, "pid": _teleop._proc.pid}
+        proc = _teleop._proc
+        if proc is None:
+            raise RuntimeError("teleop process failed to start")
+        return {"ok": True, "pid": proc.pid}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/teleop/stop")
-def teleop_stop():
+def teleop_stop() -> dict[str, bool]:
     _teleop.stop()
     _arm_resume()
     return {"ok": True}
 
 
 @router.post("/record/start")
-def record_start(req: RecordRequest):
+def record_start(req: RecordRequest) -> dict[str, int | bool]:
     try:
         # Pause arm monitoring so lerobot-record can open the serial ports
         from lumo_dashboard.drivers.arm_driver import get_arm
+
         get_arm().pause_all()
-        _record.start(_record_cmd(req.task, req.num_episodes, req.repo_id), on_exit=_arm_resume)
-        return {"ok": True, "pid": _record._proc.pid}
+        _record.start(
+            _record_cmd(req.task, req.num_episodes, req.repo_id), on_exit=_arm_resume
+        )
+        proc = _record._proc
+        if proc is None:
+            raise RuntimeError("record process failed to start")
+        return {"ok": True, "pid": proc.pid}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/record/stop")
-def record_stop():
+def record_stop() -> dict[str, bool]:
     _record.stop()
     _arm_resume()
     return {"ok": True}

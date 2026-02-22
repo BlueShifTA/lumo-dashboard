@@ -1,9 +1,13 @@
 """Dual arm driver — SO-ARM101 leader (/dev/ttyACM0) + follower (/dev/ttyACM1)."""
 
+from __future__ import annotations
+
+import logging
 import sys
 import threading
 import time
-import logging
+from collections.abc import Mapping
+from typing import Protocol, TypedDict
 
 log = logging.getLogger(__name__)
 
@@ -20,10 +24,6 @@ JOINT_NAMES = [
 sys.path.insert(0, "/home/nvidia/Project/lerobot/src")
 
 try:
-    from lerobot.teleoperators.so_leader.so_leader import SOLeader
-    from lerobot.teleoperators.so_leader.config_so_leader import SOLeaderTeleopConfig
-    from lerobot.robots.so_follower.so_follower import SOFollower
-    from lerobot.robots.so_follower.config_so_follower import SOFollowerRobotConfig
     LEROBOT_AVAILABLE = True
     log.info("LeRobot imports OK")
 except Exception as e:
@@ -31,7 +31,42 @@ except Exception as e:
     log.warning(f"LeRobot not available: {e}")
 
 
-def _empty_joints():
+class JointSample(TypedDict):
+    pos: float | None
+    load: float | None
+
+
+JointsMap = dict[str, JointSample]
+
+
+class SingleArmStatus(TypedDict):
+    connected: bool
+    port: str
+    joints: JointsMap
+
+
+class LegacyArmStatus(TypedDict):
+    connected: bool
+    message: str
+    joints: JointsMap
+
+
+class DualArmStatus(TypedDict):
+    leader: SingleArmStatus
+    follower: SingleArmStatus
+
+
+class FeetechBusProtocol(Protocol):
+    motors: Mapping[str, object]
+
+    def connect(self, handshake: bool = True) -> None: ...
+    def disconnect(self, disable_torque: bool = False) -> None: ...
+    def sync_read(self, register: str) -> Mapping[str, float | None]: ...
+    def sync_write(self, register: str, values: Mapping[str, int | float]) -> None: ...
+    def enable_torque(self) -> None: ...
+
+
+def _empty_joints() -> JointsMap:
     return {name: {"pos": None, "load": None} for name in JOINT_NAMES}
 
 
@@ -47,23 +82,27 @@ class SingleArmMonitor:
         self._connected = False
         self._running = False
         self._paused = False
-        self._thread = None
-        self._arm = None
+        self._thread: threading.Thread | None = None
+        self._arm: FeetechBusProtocol | None = None
 
-    def start(self):
+    def start(self) -> None:
         if self._running:
             return
         self._running = True
         self._paused = False
-        self._thread = threading.Thread(target=self._loop, daemon=True, name=f"arm-{self.name}")
-        self._thread.start()
+        self._thread = threading.Thread(
+            target=self._loop, daemon=True, name=f"arm-{self.name}"
+        )
+        thread = self._thread
+        if thread is not None:
+            thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         self._running = False
         self._paused = False
         self._disconnect()
 
-    def pause(self):
+    def pause(self) -> None:
         """Release serial port without stopping the monitoring thread (e.g. before teleop)."""
         self._paused = True
         self._disconnect()
@@ -72,29 +111,30 @@ class SingleArmMonitor:
             self._joints = _empty_joints()
         log.info(f"[{self.name}] Paused (serial port released)")
 
-    def resume(self):
+    def resume(self) -> None:
         """Re-enable monitoring after teleop/record exits."""
         self._paused = False
         log.info(f"[{self.name}] Resumed (will reconnect)")
 
-    def _connect(self):
+    def _connect(self) -> bool:
         try:
             # Use FeetechMotorsBus directly — read-only monitoring.
             # Never call configure() or enable_torque() so the arm stays
             # in whatever torque/position state it was already in.
-            from lerobot.motors import Motor, MotorNormMode
-            from lerobot.motors.feetech import FeetechMotorsBus
             import json
             from pathlib import Path
 
+            from lerobot.motors import Motor, MotorNormMode
+            from lerobot.motors.feetech import FeetechMotorsBus
+
             norm = MotorNormMode.DEGREES
             motors = {
-                "shoulder_pan":  Motor(1, "sts3215", norm),
+                "shoulder_pan": Motor(1, "sts3215", norm),
                 "shoulder_lift": Motor(2, "sts3215", norm),
-                "elbow_flex":    Motor(3, "sts3215", norm),
-                "wrist_flex":    Motor(4, "sts3215", norm),
-                "wrist_roll":    Motor(5, "sts3215", norm),
-                "gripper":       Motor(6, "sts3215", MotorNormMode.RANGE_0_100),
+                "elbow_flex": Motor(3, "sts3215", norm),
+                "wrist_flex": Motor(4, "sts3215", norm),
+                "wrist_roll": Motor(5, "sts3215", norm),
+                "gripper": Motor(6, "sts3215", MotorNormMode.RANGE_0_100),
             }
 
             # Load calibration file so positions are normalized correctly
@@ -104,9 +144,10 @@ class SingleArmMonitor:
             else:
                 cal_path = CAL_ROOT / "robots/so_follower/beluga_follower_arm.json"
 
-            calibration = None
+            calibration: object | None = None
             if cal_path.exists():
                 from lerobot.motors import MotorCalibration
+
                 raw_cal = json.loads(cal_path.read_text())
                 calibration = {
                     name: MotorCalibration(
@@ -119,7 +160,9 @@ class SingleArmMonitor:
                     for name, data in raw_cal.items()
                 }
 
-            bus = FeetechMotorsBus(port=self.port, motors=motors, calibration=calibration)
+            bus = FeetechMotorsBus(
+                port=self.port, motors=motors, calibration=calibration
+            )
             # Connect with handshake to verify motors are present — no torque/config changes
             bus.connect(handshake=True)
             self._arm = bus
@@ -132,20 +175,26 @@ class SingleArmMonitor:
             self._connected = False
             return False
 
-    def _read_joints(self):
+    def _read_joints(self) -> JointsMap | None:
         try:
             # Read Present_Position directly — no torque or Goal_Position writes
-            raw = self._arm.sync_read("Present_Position")
-            joints = {}
+            arm = self._arm
+            if arm is None:
+                return None
+            raw = arm.sync_read("Present_Position")
+            joints: JointsMap = {}
             for name in JOINT_NAMES:
                 val = raw.get(name)
-                joints[name] = {"pos": round(float(val), 1) if val is not None else None, "load": None}
+                joints[name] = {
+                    "pos": round(float(val), 1) if val is not None else None,
+                    "load": None,
+                }
             return joints
         except Exception as e:
             log.warning(f"[{self.name}] Read error: {e}")
             return None
 
-    def _disconnect(self):
+    def _disconnect(self) -> None:
         try:
             if self._arm:
                 # disconnect without touching torque — pass disable_torque=False
@@ -154,7 +203,7 @@ class SingleArmMonitor:
             pass
         self._arm = None
 
-    def _loop(self):
+    def _loop(self) -> None:
         retry_delay = 3.0
         while self._running:
             if self._paused:
@@ -181,7 +230,7 @@ class SingleArmMonitor:
 
             time.sleep(0.1)  # 10 Hz
 
-    def get_status(self) -> dict:
+    def get_status(self) -> SingleArmStatus:
         with self._lock:
             return {
                 "connected": self._connected,
@@ -193,24 +242,25 @@ class SingleArmMonitor:
 class ArmDriver:
     """Dual-arm monitor: leader + follower."""
 
-    def __init__(self):
-        from lumo_dashboard.core.config import get_leader_port, get_follower_port
+    def __init__(self) -> None:
+        from lumo_dashboard.core.config import get_follower_port, get_leader_port
+
         self.leader = SingleArmMonitor("leader", get_leader_port(), "leader")
         self.follower = SingleArmMonitor("follower", get_follower_port(), "follower")
         self.leader.start()
         self.follower.start()
 
-    def pause_all(self):
+    def pause_all(self) -> None:
         """Release serial ports so external processes (teleop/record) can use them."""
         self.leader.pause()
         self.follower.pause()
 
-    def resume_all(self):
+    def resume_all(self) -> None:
         """Resume monitoring after external process exits."""
         self.leader.resume()
         self.follower.resume()
 
-    def set_ports(self, leader_port: str, follower_port: str):
+    def set_ports(self, leader_port: str, follower_port: str) -> None:
         """Reconnect arms on new ports."""
         if self.leader.port != leader_port:
             self.leader.stop()
@@ -221,7 +271,7 @@ class ArmDriver:
             self.follower = SingleArmMonitor("follower", follower_port, "follower")
             self.follower.start()
 
-    def get_status(self) -> dict:
+    def get_status(self) -> LegacyArmStatus:
         """Legacy single-arm status — returns follower for backwards compat."""
         fs = self.follower.get_status()
         return {
@@ -230,22 +280,23 @@ class ArmDriver:
             "joints": fs["joints"],
         }
 
-    def get_dual_status(self) -> dict:
+    def get_dual_status(self) -> DualArmStatus:
         return {
             "leader": self.leader.get_status(),
             "follower": self.follower.get_status(),
         }
 
-    def move(self, joints: dict, speed: int = 50) -> dict:
+    def move(self, joints: Mapping[str, float], speed: int = 50) -> dict[str, object]:
+        del joints, speed
         return {"ok": False, "error": "Move not implemented in monitor mode"}
 
-    def home(self) -> dict:
+    def home(self) -> dict[str, object]:
         return {"ok": False, "error": "Home not implemented in monitor mode"}
 
-    def stop(self) -> dict:
+    def stop(self) -> dict[str, object]:
         return {"ok": True, "message": "Stop acknowledged"}
 
-    def calibration(self) -> dict:
+    def calibration(self) -> dict[str, object]:
         return {"ok": False, "error": "Not implemented"}
 
 

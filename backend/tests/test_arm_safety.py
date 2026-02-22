@@ -19,22 +19,66 @@ import json
 import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call, PropertyMock
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 # ---------------------------------------------------------------------------
 # Fake calibration data matching beluga_follower_arm.json structure
 # ---------------------------------------------------------------------------
 FAKE_CAL = {
-    "shoulder_pan":  {"id": 1, "drive_mode": 0, "homing_offset": -2027, "range_min": 943,  "range_max": 3337},
-    "shoulder_lift": {"id": 2, "drive_mode": 0, "homing_offset": -1001, "range_min": 775,  "range_max": 3266},
-    "elbow_flex":    {"id": 3, "drive_mode": 0, "homing_offset":  1258, "range_min": 890,  "range_max": 3081},
-    "wrist_flex":    {"id": 4, "drive_mode": 0, "homing_offset": -1973, "range_min": 652,  "range_max": 3222},
-    "wrist_roll":    {"id": 5, "drive_mode": 0, "homing_offset": -1883, "range_min": 0,    "range_max": 4095},
-    "gripper":       {"id": 6, "drive_mode": 0, "homing_offset":  1107, "range_min": 1925, "range_max": 3343},
+    "shoulder_pan": {
+        "id": 1,
+        "drive_mode": 0,
+        "homing_offset": -2027,
+        "range_min": 943,
+        "range_max": 3337,
+    },
+    "shoulder_lift": {
+        "id": 2,
+        "drive_mode": 0,
+        "homing_offset": -1001,
+        "range_min": 775,
+        "range_max": 3266,
+    },
+    "elbow_flex": {
+        "id": 3,
+        "drive_mode": 0,
+        "homing_offset": 1258,
+        "range_min": 890,
+        "range_max": 3081,
+    },
+    "wrist_flex": {
+        "id": 4,
+        "drive_mode": 0,
+        "homing_offset": -1973,
+        "range_min": 652,
+        "range_max": 3222,
+    },
+    "wrist_roll": {
+        "id": 5,
+        "drive_mode": 0,
+        "homing_offset": -1883,
+        "range_min": 0,
+        "range_max": 4095,
+    },
+    "gripper": {
+        "id": 6,
+        "drive_mode": 0,
+        "homing_offset": 1107,
+        "range_min": 1925,
+        "range_max": 3343,
+    },
 }
 
-JOINT_NAMES = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
+JOINT_NAMES = [
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+]
 
 # Realistic "current positions" the mock bus returns
 CURRENT_POSITIONS = {
@@ -60,13 +104,16 @@ def make_mock_bus(current_positions=None):
 def _make_monitor(arm_type="follower", connected=False, mock_bus=None):
     """Build a SingleArmMonitor with mocked lerobot, no real thread."""
     # Patch all lerobot imports so they never actually load
-    with patch.dict("sys.modules", {
-        "lerobot": MagicMock(),
-        "lerobot.motors": MagicMock(),
-        "lerobot.motors.feetech": MagicMock(),
-    }):
-        import importlib
+    with patch.dict(
+        "sys.modules",
+        {
+            "lerobot": MagicMock(),
+            "lerobot.motors": MagicMock(),
+            "lerobot.motors.feetech": MagicMock(),
+        },
+    ):
         import sys
+
         # Remove cached module if any
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
@@ -85,6 +132,7 @@ def _make_monitor(arm_type="follower", connected=False, mock_bus=None):
 # ---------------------------------------------------------------------------
 # Test helpers that operate directly on SingleArmMonitor internals
 # ---------------------------------------------------------------------------
+
 
 class TestConnectSafety:
     """Invariant 1: connect() must NEVER write to motors."""
@@ -114,14 +162,18 @@ class TestConnectSafety:
 
         with patch.dict("sys.modules", modules):
             import sys
+
             for m in list(sys.modules):
                 if "lumo_dashboard" in m:
                     del sys.modules[m]
             sys.path.insert(0, str(Path(__file__).parent.parent))
 
-            with patch("pathlib.Path.exists", return_value=True), \
-                 patch("pathlib.Path.read_text", return_value=cal_json):
+            with (
+                patch("pathlib.Path.exists", return_value=True),
+                patch("pathlib.Path.read_text", return_value=cal_json),
+            ):
                 from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
+
                 monitor = SingleArmMonitor("test", "/dev/ttyACM0", arm_type)
                 result = monitor._connect()
 
@@ -150,8 +202,9 @@ class TestConnectSafety:
         """CRITICAL: no Goal_Position writes during connect — prevents motor snap."""
         ok, bus = self._run_connect()
         for c in bus.sync_write.call_args_list:
-            assert "Goal_Position" not in str(c), \
+            assert "Goal_Position" not in str(c), (
                 f"Goal_Position was written during connect: {c}"
+            )
         bus.sync_write.assert_not_called()
 
     def test_connect_never_calls_configure(self):
@@ -164,32 +217,41 @@ class TestConnectSafety:
         """Leader arm must load from teleoperators/so_leader path."""
         read_paths = []
 
-        original_read_text = Path.read_text
         def capturing_read_text(self_path, *args, **kwargs):
             read_paths.append(str(self_path))
             return json.dumps(FAKE_CAL)
 
-        with patch.dict("sys.modules", {
-            "lerobot": MagicMock(),
-            "lerobot.motors": MagicMock(
-                Motor=MagicMock(), MotorNormMode=MagicMock(), MotorCalibration=MagicMock()
-            ),
-            "lerobot.motors.feetech": MagicMock(),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(
+                    Motor=MagicMock(),
+                    MotorNormMode=MagicMock(),
+                    MotorCalibration=MagicMock(),
+                ),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             import sys
+
             for m in list(sys.modules):
                 if "lumo_dashboard" in m:
                     del sys.modules[m]
             sys.path.insert(0, str(Path(__file__).parent.parent))
 
-            with patch("pathlib.Path.exists", return_value=True), \
-                 patch("pathlib.Path.read_text", capturing_read_text):
+            with (
+                patch("pathlib.Path.exists", return_value=True),
+                patch("pathlib.Path.read_text", capturing_read_text),
+            ):
                 from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
+
                 mon = SingleArmMonitor("leader", "/dev/ttyACM0", "leader")
                 mon._connect()
 
-        assert any("so_leader" in p for p in read_paths), \
+        assert any("so_leader" in p for p in read_paths), (
             f"Leader should load so_leader calibration, but read paths were: {read_paths}"
+        )
 
 
 class TestDisconnectSafety:
@@ -197,12 +259,20 @@ class TestDisconnectSafety:
 
     def _make_connected_monitor(self):
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
 
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
 
         monitor = SingleArmMonitor("test", "/dev/ttyACM0", "follower")
@@ -246,11 +316,19 @@ class TestReadSafety:
 
     def _make_monitor_with_bus(self, positions=None):
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
         monitor = SingleArmMonitor("test", "/dev/ttyACM0", "follower")
         bus = make_mock_bus(positions)
@@ -317,12 +395,19 @@ class TestJointMoveSafety:
     def _build_follower(self, current_positions=None):
         """Return (app, arm_driver_module) with mock bus injected."""
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
-            from lumo_dashboard.drivers import arm_driver
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
 
         mock_bus = make_mock_bus(current_positions or CURRENT_POSITIONS)
@@ -335,48 +420,69 @@ class TestJointMoveSafety:
         """sync_read must be called BEFORE sync_write."""
         follower, bus = self._build_follower()
         call_order = []
-        bus.sync_read.side_effect = lambda *a, **kw: (call_order.append("read"), CURRENT_POSITIONS)[1]
+        bus.sync_read.side_effect = lambda *a, **kw: (
+            call_order.append("read"),
+            CURRENT_POSITIONS,
+        )[1]
         bus.sync_write.side_effect = lambda *a, **kw: call_order.append("write")
         bus.enable_torque.side_effect = lambda *a, **kw: call_order.append("torque")
 
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
-            from lumo_dashboard.drivers.arm_driver import ArmDriver, get_arm
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             import lumo_dashboard.drivers.arm_driver as arm_mod
+
             arm_mod._arm = MagicMock()
             arm_mod._arm.follower = follower
 
-            from lumo_dashboard.api.arm import follower_joint_move
-            from lumo_dashboard.api.arm import JointMoveRequest
+            from lumo_dashboard.api.arm import JointMoveRequest, follower_joint_move
 
         follower_joint_move(JointMoveRequest(joint="shoulder_pan", angle=30.0))
-        assert call_order == ["read", "write", "torque"], \
+        assert call_order == ["read", "write", "torque"], (
             f"UNSAFE call order: {call_order}. Expected read → write → torque"
+        )
 
     def test_move_includes_all_joints_in_write(self):
         """sync_write must include ALL 6 joints — never a partial write."""
         follower, bus = self._build_follower()
 
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
-            from lumo_dashboard.drivers.arm_driver import ArmDriver
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             import lumo_dashboard.drivers.arm_driver as arm_mod
+
             arm_mod._arm = MagicMock()
             arm_mod._arm.follower = follower
-            from lumo_dashboard.api.arm import follower_joint_move, JointMoveRequest
+            from lumo_dashboard.api.arm import JointMoveRequest, follower_joint_move
 
         follower_joint_move(JointMoveRequest(joint="elbow_flex", angle=20.0))
 
         write_calls = bus.sync_write.call_args_list
-        assert len(write_calls) == 1, f"Expected exactly 1 sync_write, got {len(write_calls)}"
+        assert len(write_calls) == 1, (
+            f"Expected exactly 1 sync_write, got {len(write_calls)}"
+        )
         data_name, goal_dict = write_calls[0][0]
         assert data_name == "Goal_Position"
         missing = [j for j in JOINT_NAMES if j not in goal_dict]
@@ -387,15 +493,24 @@ class TestJointMoveSafety:
         follower, bus = self._build_follower()
 
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             import lumo_dashboard.drivers.arm_driver as arm_mod
+
             arm_mod._arm = MagicMock()
             arm_mod._arm.follower = follower
-            from lumo_dashboard.api.arm import follower_joint_move, JointMoveRequest
+            from lumo_dashboard.api.arm import JointMoveRequest, follower_joint_move
 
         follower_joint_move(JointMoveRequest(joint="wrist_flex", angle=15.0))
 
@@ -404,43 +519,65 @@ class TestJointMoveSafety:
         # All other joints must equal their current positions
         for j in JOINT_NAMES:
             if j != "wrist_flex":
-                assert goal_dict[j] == CURRENT_POSITIONS[j], \
+                assert goal_dict[j] == CURRENT_POSITIONS[j], (
                     f"Joint {j} changed from {CURRENT_POSITIONS[j]} to {goal_dict[j]} — UNSAFE"
+                )
 
     def test_enable_torque_called_after_goal_position_set(self):
         """enable_torque() must come AFTER sync_write() — never before."""
         follower, bus = self._build_follower()
         write_called_before_torque = []
+
         def mock_enable_torque():
             # At the moment torque is enabled, sync_write must already have been called
             write_called_before_torque.append(bus.sync_write.called)
+
         bus.enable_torque.side_effect = mock_enable_torque
 
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             import lumo_dashboard.drivers.arm_driver as arm_mod
+
             arm_mod._arm = MagicMock()
             arm_mod._arm.follower = follower
-            from lumo_dashboard.api.arm import follower_joint_move, JointMoveRequest
+            from lumo_dashboard.api.arm import JointMoveRequest, follower_joint_move
 
         follower_joint_move(JointMoveRequest(joint="gripper", angle=80.0))
-        assert write_called_before_torque == [True], \
+        assert write_called_before_torque == [True], (
             "enable_torque() was called BEFORE sync_write — motors would snap!"
+        )
 
     def test_move_offline_returns_503(self):
         """No bus calls when arm is offline."""
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
-            from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             import lumo_dashboard.drivers.arm_driver as arm_mod
+            from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
+
             arm_mod._arm = MagicMock()
 
         bus = make_mock_bus()
@@ -449,9 +586,17 @@ class TestJointMoveSafety:
         offline_follower._arm = None
         arm_mod._arm.follower = offline_follower
 
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
-            from lumo_dashboard.api.arm import follower_joint_move, JointMoveRequest
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from fastapi import HTTPException
+
+            from lumo_dashboard.api.arm import JointMoveRequest, follower_joint_move
 
         with pytest.raises(HTTPException) as exc:
             follower_joint_move(JointMoveRequest(joint="shoulder_pan", angle=10.0))
@@ -468,16 +613,17 @@ class TestAngleClamping:
     # This is intentional: failing tests document the gap.
 
     CAL_LIMITS = {
-        "shoulder_pan":  {"min": -105.2, "max": 105.2},
+        "shoulder_pan": {"min": -105.2, "max": 105.2},
         "shoulder_lift": {"min": -109.5, "max": 109.5},
-        "elbow_flex":    {"min": -96.3,  "max": 96.3},
-        "wrist_flex":    {"min": -113.0, "max": 113.0},
-        "wrist_roll":    {"min": -180.0, "max": 180.0},
-        "gripper":       {"min": 0.0,    "max": 100.0},
+        "elbow_flex": {"min": -96.3, "max": 96.3},
+        "wrist_flex": {"min": -113.0, "max": 113.0},
+        "wrist_roll": {"min": -180.0, "max": 180.0},
+        "gripper": {"min": 0.0, "max": 100.0},
     }
 
     def _run_move_with_angle(self, joint, angle):
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
@@ -491,12 +637,13 @@ class TestAngleClamping:
             "lerobot.motors.feetech": MagicMock(),
         }
 
-        with patch.dict("sys.modules", mock_modules), \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.read_text", return_value=json.dumps(FAKE_CAL)):
-
-            from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
+        with (
+            patch.dict("sys.modules", mock_modules),
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.read_text", return_value=json.dumps(FAKE_CAL)),
+        ):
             import lumo_dashboard.drivers.arm_driver as arm_mod
+            from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
 
             follower = SingleArmMonitor("follower", "/dev/ttyACM1", "follower")
             follower._arm = bus
@@ -506,7 +653,8 @@ class TestAngleClamping:
             mock_arm.follower = follower
             arm_mod._arm = mock_arm
 
-            from lumo_dashboard.api.arm import follower_joint_move, JointMoveRequest
+            from lumo_dashboard.api.arm import JointMoveRequest, follower_joint_move
+
             follower_joint_move(JointMoveRequest(joint=joint, angle=angle))
 
         _, goal_dict = bus.sync_write.call_args[0]
@@ -515,14 +663,16 @@ class TestAngleClamping:
     def test_angle_above_max_is_clamped(self):
         """Sending 200° to shoulder_pan (max ~105.2°) must be clamped."""
         result = self._run_move_with_angle("shoulder_pan", 200.0)
-        assert result <= 105.3, \
+        assert result <= 105.3, (
             f"shoulder_pan sent {result}° but max is ~105.2° — motor could burn"
+        )
 
     def test_angle_below_min_is_clamped(self):
         """Sending -200° to shoulder_pan (min ~-105.2°) must be clamped."""
         result = self._run_move_with_angle("shoulder_pan", -200.0)
-        assert result >= -105.3, \
+        assert result >= -105.3, (
             f"shoulder_pan sent {result}° but min is ~-105.2° — motor could burn"
+        )
 
 
 class TestPortSwapSafety:
@@ -530,16 +680,29 @@ class TestPortSwapSafety:
 
     def _make_arm_driver(self):
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from lumo_dashboard.core.config import update_config
-            update_config({"leader_port": "/dev/ttyACM0", "follower_port": "/dev/ttyACM1"})
+
+            update_config(
+                {"leader_port": "/dev/ttyACM0", "follower_port": "/dev/ttyACM1"}
+            )
             from lumo_dashboard.drivers.arm_driver import ArmDriver
+
             driver = ArmDriver.__new__(ArmDriver)
             from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
+
             driver.leader = SingleArmMonitor("leader", "/dev/ttyACM0", "leader")
             driver.follower = SingleArmMonitor("follower", "/dev/ttyACM1", "follower")
         return driver
@@ -587,11 +750,19 @@ class TestThreadSafety:
     def test_concurrent_reads_do_not_corrupt_state(self):
         """Read _joints from multiple threads simultaneously — no race conditions."""
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
 
         monitor = SingleArmMonitor("test", "/dev/ttyACM0", "follower")
@@ -628,18 +799,28 @@ class TestThreadSafety:
     def test_connected_flag_consistent_with_arm(self):
         """_connected=True must imply _arm is not None."""
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
 
         monitor = SingleArmMonitor("test", "/dev/ttyACM0", "follower")
         # When connected, _arm must be set
         monitor._connected = True
         monitor._arm = make_mock_bus()
-        assert monitor._arm is not None, "Connected but _arm is None — inconsistent state"
+        assert monitor._arm is not None, (
+            "Connected but _arm is None — inconsistent state"
+        )
 
         # When disconnected, _arm should be None
         monitor._arm = None
@@ -653,15 +834,25 @@ class TestCalibrationEndpoint:
     def test_follower_ranges_within_physical_limits(self):
         """Follower joint ranges should be symmetric around 0 and < 180°."""
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from lumo_dashboard.api.arm import arm_calibration
 
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.read_text", return_value=json.dumps(FAKE_CAL)):
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.read_text", return_value=json.dumps(FAKE_CAL)),
+        ):
             result = arm_calibration()
 
         follower = result["follower"]
@@ -672,19 +863,32 @@ class TestCalibrationEndpoint:
             else:
                 assert lim["min"] < 0, f"{name} min should be negative"
                 assert lim["max"] > 0, f"{name} max should be positive"
-                assert abs(lim["min"]) <= 180.0, f"{name} min {lim['min']} exceeds motor range"
-                assert lim["max"] <= 180.0, f"{name} max {lim['max']} exceeds motor range"
+                assert abs(lim["min"]) <= 180.0, (
+                    f"{name} min {lim['min']} exceeds motor range"
+                )
+                assert lim["max"] <= 180.0, (
+                    f"{name} max {lim['max']} exceeds motor range"
+                )
                 # Should be symmetric (within float tolerance)
-                assert abs(abs(lim["min"]) - lim["max"]) < 0.5, \
+                assert abs(abs(lim["min"]) - lim["max"]) < 0.5, (
                     f"{name} range not symmetric: {lim['min']} / {lim['max']}"
+                )
 
     def test_missing_calibration_file_returns_empty(self):
         import sys
+
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        with patch.dict("sys.modules", {"lerobot": MagicMock(), "lerobot.motors": MagicMock(), "lerobot.motors.feetech": MagicMock()}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "lerobot": MagicMock(),
+                "lerobot.motors": MagicMock(),
+                "lerobot.motors.feetech": MagicMock(),
+            },
+        ):
             from lumo_dashboard.api.arm import arm_calibration
 
         with patch("pathlib.Path.exists", return_value=False):

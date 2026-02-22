@@ -1,7 +1,7 @@
 # Lumo Dashboard — Specification
-**Version:** 0.1  
-**Date:** 2026-02-20  
-**Status:** Draft — Ready for Implementation  
+**Version:** 0.1
+**Date:** 2026-02-20
+**Status:** Draft — Ready for Implementation
 **Repo:** BlueShifTA/lumo-dashboard
 
 See `CLAUDE.md` for the primary project guide and current repo/runtime conventions.
