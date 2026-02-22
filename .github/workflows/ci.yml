@@ -37,7 +37,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           PYTHONPATH=backend uv run pytest backend/tests \
-            --cov=backend/app_template \
+            --cov=backend/lumo_dashboard \
             --cov-report=xml:coverage.xml \
             --cov-report=term-missing \
             --cov-fail-under=80
@@ -74,7 +74,7 @@ jobs:
         run: uv run ruff check backend
 
       - name: Mypy type check
-        run: PYTHONPATH=backend uv run mypy backend/app_template
+        run: PYTHONPATH=backend uv run mypy backend/lumo_dashboard
 
   # ─────────────────────────────────────────────────────────────
   # Frontend Tests & Lint
@@ -104,7 +104,7 @@ jobs:
       - name: Build check
         run: npm run build
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8002
 
   # ─────────────────────────────────────────────────────────────
   # Docker Build (on main branch only)
@@ -126,7 +126,7 @@ jobs:
           context: .
           file: devops/backend.dockerfile
           push: false
-          tags: app-template-backend:${{ github.sha }}
+          tags: lumo-dashboard-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -136,8 +136,8 @@ jobs:
           context: .
           file: devops/frontend.dockerfile
           push: false
-          tags: app-template-frontend:${{ github.sha }}
+          tags: lumo-dashboard-frontend:${{ github.sha }}
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+            NEXT_PUBLIC_API_BASE_URL=http://localhost:8002
           cache-from: type=gha
           cache-to: type=gha,mode=max

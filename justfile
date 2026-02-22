@@ -28,7 +28,7 @@ install-frontend:
 
 [group('run')]
 run-backend:
-  PYTHONPATH=backend uv run uvicorn app_template.main:app --reload --port 8000
+  PYTHONPATH=backend uv run uvicorn lumo_dashboard.main:app --reload --port 8002
 
 [group('run')]
 run-frontend:
@@ -51,7 +51,7 @@ test:
 [doc("Run backend tests with coverage and fail if below threshold")]
 test-cov threshold="80":
   PYTHONPATH=backend uv run pytest backend/tests \
-    --cov=backend/app_template \
+    --cov=backend/lumo_dashboard \
     --cov-report term-missing \
     --cov-report xml:coverage.xml \
     --cov-fail-under={{threshold}}
@@ -61,16 +61,16 @@ test-cov threshold="80":
 run-ci:
   uv sync --frozen
   PYTHONPATH=backend uv run pytest backend/tests \
-    --cov=backend/app_template \
+    --cov=backend/lumo_dashboard \
     --cov-report=xml:coverage.xml \
     --cov-report=term-missing \
     --cov-fail-under=80
   uv run ruff format --check backend
   uv run ruff check backend
-  PYTHONPATH=backend uv run mypy backend/app_template
+  PYTHONPATH=backend uv run mypy backend/lumo_dashboard
   cd frontend && npm ci
   cd frontend && npm run lint
-  cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run build
+  cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:8002 npm run build
 
 [group('test')]
 [doc("Alias for run-ci")]
@@ -91,7 +91,7 @@ format:
 
 [group('lint')]
 typecheck:
-  PYTHONPATH=backend uv run mypy backend/app_template
+  PYTHONPATH=backend uv run mypy backend/lumo_dashboard
 
 # ─────────────────────────────────────────────────────────────
 # Docker
@@ -125,7 +125,7 @@ docker-prod:
 [group('util')]
 [doc("Export OpenAPI schema from running backend")]
 export-openapi:
-  curl -s http://127.0.0.1:8000/openapi.json | python -m json.tool > openapi.json
+  curl -s http://127.0.0.1:8002/openapi.json | python -m json.tool > openapi.json
 
 [group('util')]
 [doc("Create and push git tag: `just tag 0.0.1` or auto-increment with `just tag`")]

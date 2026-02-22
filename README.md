@@ -1,157 +1,120 @@
-# FastAPI + Next.js Template
+# Lumo Dashboard
 
-A production-ready fullstack template with FastAPI backend and Next.js frontend, containerized for deployment.
+Lumo Dashboard is a FastAPI + Next.js application for monitoring and controlling Beluga's robot arm and camera system on a Jetson Orin device.
 
-## 🏗️ Project Structure
+This repo is no longer a generic scaffold. The active backend package is `backend/lumo_dashboard`, and the frontend is tailored to the arm/camera dashboard workflow.
 
+## Start Here
+
+- `CLAUDE.md`: primary operator/developer guide (current runtime model, commands, safety notes)
+- `TASK.md`: implementation brief and acceptance checklist
+- `SPEC.md`: architecture, hardware reference, and phased plan
+
+## Project Structure
+
+```text
+backend/
+  lumo_dashboard/          FastAPI app (APIs, drivers, runtime config)
+  camera_service_reference.py
+  tests/                   Mock-safe backend tests (arm safety, joint limits)
+frontend/
+  app/                     Next.js App Router UI
+devops/
+  backend.dockerfile
+  backend.test.dockerfile
+  frontend.dockerfile
+  .pre-commit-config.yaml
+.github/workflows/         CI/CD pipelines
+justfile                   Dev/test/lint helpers
 ```
-├── backend/
-│   └── app_template/       # FastAPI application
-│       ├── api/            # API routers
-│       ├── core/           # Config, utilities
-│       ├── domain/         # Models, schemas
-│       └── services/       # Business logic
-│   └── tests/              # pytest tests
-├── frontend/               # Next.js application
-│   └── app/                # App Router pages
-├── devops/
-│   ├── backend.dockerfile
-│   ├── frontend.dockerfile
-│   └── .pre-commit-config.yaml
-├── .github/workflows/      # CI/CD pipelines
-├── docker-compose.yml
-├── pyproject.toml          # Python project (uv)
-└── justfile                # Task runner
-```
 
-## 🚀 Quick Start
+## Local Development
 
-### Prerequisites
+Prerequisites:
 - Python 3.13+
 - Node.js 22+
-- [uv](https://github.com/astral-sh/uv) (Python package manager)
-- [just](https://github.com/casey/just) (command runner)
-- Docker & Docker Compose
+- `uv`
+- `just`
 
-### Local Development
+Install dependencies:
 
 ```bash
-# Install all dependencies
 just install
+```
 
-# Run backend (port 8000)
+Run backend (FastAPI, port `8002`):
+
+```bash
 just run-backend
+```
 
-# Run frontend (port 3000) - in another terminal
+Run frontend dev server (port `3000`):
+
+```bash
 just run-frontend
 ```
 
-### Docker
+Device-style backend launcher (serves built frontend via FastAPI, port `8002`):
 
 ```bash
-# Build and run
-just docker-up
-
-# View logs
-just docker-logs
-
-# Stop
-just docker-down
+./start.sh
 ```
 
-## 📋 Available Commands
+## API Surface (Current)
+
+- `GET /health`
+- `WS /ws/telemetry`
+- `/api/arm/*`
+- `/api/camera/*`
+- `/api/config/*`
+- `/api/processes/*`
+
+OpenAPI docs:
+- `/docs`
+- `/redoc`
+
+## Testing and Checks
 
 ```bash
-just              # List all commands
-just install      # Install all dependencies
-just run-backend  # Start FastAPI dev server
-just run-frontend # Start Next.js dev server
-just test         # Run backend tests
-just test-cov 80  # Run tests with 80% coverage threshold
-just run-ci       # Run CI-equivalent checks locally
-just lint         # Run all linters
-just typecheck    # Run mypy
-just tag 0.0.1    # Create and push tag v0.0.1
-just tag          # Auto-increment latest patch tag (with confirmation)
-just docker-build # Build Docker images
-just docker-up    # Start containers
-just docker-prod  # Build & run production mode
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
 just test
-
-# Run with coverage
 just test-cov 80
-
-# Run the same checks as GitHub Actions CI locally
+just typecheck
+just lint
 just run-ci
 ```
 
-## 🔧 Configuration
+## Configuration
 
-Copy `.env.example` to `.env` and customize:
+Copy the example env file and adjust for your environment:
 
 ```bash
 cp .env.example .env
 ```
 
-Key environment variables:
-- `API_HOST` / `API_PORT` - Backend server settings
-- `NEXT_PUBLIC_API_BASE_URL` - Frontend API endpoint
-- `DEBUG` - Enable debug mode
+Common settings:
+- `API_HOST`, `API_PORT`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `DEBUG`
 
-## 📦 CI/CD
+Auth is optional in this repo. If you add auth, generate a real secret and keep it out of git.
 
-### GitHub Actions Workflows
+## Docker
 
-1. **CI** (`.github/workflows/ci.yml`)
-   - Runs on push/PR to main
-   - Backend: tests, coverage, ruff, mypy
-   - Frontend: lint, build check
-   - Docker build (main branch only)
-
-2. **CD** (`.github/workflows/cd.yml`)
-   - Triggered by version tags (`v*`)
-   - Builds & pushes to GitHub Container Registry
-   - Deploy placeholder (customize for your infra)
-
-### Creating a Release
+Development-style compose:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+just docker-up
+just docker-logs
+just docker-down
 ```
 
-## 🎨 Customization
+Production override:
 
-### Renaming the Project
+```bash
+just docker-prod
+```
 
-1. Rename `backend/app_template/` to your project name
-2. Update `pyproject.toml`:
-   - `name`
-   - `[tool.hatch.build.targets.wheel]` packages
-   - `[tool.coverage.run]` source
-   - `[tool.mypy]` files
-3. Update imports in all Python files
-4. Update `justfile` uvicorn command
-5. Update Docker image names in workflows
+## Notes
 
-### Adding a Database
-
-1. Add dependency to `pyproject.toml`:
-   ```toml
-   "sqlalchemy>=2.0",
-   "asyncpg",  # for PostgreSQL
-   ```
-
-2. Uncomment postgres service in `docker-compose.yml`
-
-3. Add database connection in `core/config.py`
-
-## 📄 License
-
-MIT
+- Hardware may be partially connected during development (camera on, arm off). The UI and APIs should degrade gracefully.
+- Backend tests are written to avoid requiring live hardware.

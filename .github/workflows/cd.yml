@@ -113,12 +113,12 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.example.com' }}
+            NEXT_PUBLIC_API_BASE_URL=${{ vars.API_BASE_URL || 'http://127.0.0.1:8002' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────────────────────
-  # Deploy (placeholder - customize for your infra)
+  # Deploy (project-specific steps vary by host)
   # ─────────────────────────────────────────────────────────────
   deploy:
     name: Deploy
@@ -128,11 +128,11 @@ jobs:
     steps:
       - name: Deploy notification
         run: |
-          echo "🚀 Ready to deploy!"
+          echo "Lumo Dashboard images built and ready to deploy."
           echo "Backend: ${{ needs.build-backend.outputs.image }}"
           echo "Frontend: ${{ needs.build-frontend.outputs.image }}"
           echo ""
-          echo "Add your deployment steps here:"
+          echo "Add deployment steps for your target host/environment:"
           echo "  - kubectl apply"
           echo "  - docker compose pull && docker compose up -d"
           echo "  - terraform apply"

@@ -20,4 +20,4 @@ COPY backend/ ./backend/
 ENV PYTHONPATH=/app/backend
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["pytest", "backend/tests", "-v", "--cov=backend/app_template", "--cov-report=xml:coverage.xml"]
+CMD ["pytest", "backend/tests", "-v", "--cov=backend/lumo_dashboard", "--cov-report=xml:coverage.xml"]

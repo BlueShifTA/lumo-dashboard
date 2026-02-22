@@ -3,11 +3,10 @@
 ## Project Structure
 
 - `backend/`: FastAPI backend
-  - `app_template/`: main package
-    - `main.py`: app entrypoint
-    - `api/`: HTTP routes (health, items)
-    - `services/`: business logic
-    - `domain/`: models, schemas
+  - `lumo_dashboard/`: main package
+    - `main.py`: app entrypoint (serves API + frontend static build)
+    - `api/`: HTTP routes (arm, camera, config, processes, websocket telemetry)
+    - `drivers/`: hardware integrations (arm + camera)
     - `core/`: config, utilities
   - `tests/`: pytest tests
 - `frontend/`: Next.js UI
@@ -21,7 +20,8 @@
 
 - Task runner: `just`
 - Install deps: `just install`
-- Run backend: `just run-backend` (port 8000)
+- Run backend: `just run-backend` (port 8002)
+- Device/service launcher: `./start.sh` (port 8002, serves frontend static build via FastAPI)
 - Run frontend: `just run-frontend` (port 3000)
 - Run tests: `just test`
 - Run tests with coverage: `just test-cov 80`
@@ -51,8 +51,8 @@
 ## API Conventions
 
 - Health endpoint: `GET /health`
-- Readiness endpoint: `GET /ready`
-- API routes prefixed with `/api`
+- WebSocket telemetry: `WS /ws/telemetry`
+- REST routes for arm/camera/config/processes are prefixed with `/api`
 - OpenAPI docs at `/docs` and `/redoc`
 
 ## Frontend
@@ -69,9 +69,9 @@
 
 ## Adding New Features
 
-1. Create domain model in `backend/app_template/domain/`
-2. Add service logic in `backend/app_template/services/`
-3. Create API router in `backend/app_template/api/`
+1. Create domain model (if needed) in the relevant `backend/lumo_dashboard/` module
+2. Add driver/core logic in `backend/lumo_dashboard/drivers/` or `backend/lumo_dashboard/core/`
+3. Create API router in `backend/lumo_dashboard/api/`
 4. Register router in `main.py`
 5. Add tests in `backend/tests/`
 6. Update frontend as needed

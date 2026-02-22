@@ -1,8 +1,10 @@
-# Eco Robot Dashboard — Specification
+# Lumo Dashboard — Specification
 **Version:** 0.1  
 **Date:** 2026-02-20  
 **Status:** Draft — Ready for Implementation  
-**Repo:** BlueShifTA/lumo-dashboard (new, from fastapi-nextjs-template)
+**Repo:** BlueShifTA/lumo-dashboard
+
+See `CLAUDE.md` for the primary project guide and current repo/runtime conventions.
 
 ---
 
@@ -155,7 +157,7 @@ POST /tasks/custom      → {script: "python3 ...", args: [...]}
 | Styling | Tailwind CSS | Template base |
 | Charts | Recharts | Lightweight, already in pravafin |
 | MJPEG | Direct GET stream | Simplest for camera feed |
-| Template | BlueShifTA/fastapi-nextjs-template | Matches your scaffold |
+| Scaffold origin | BlueShifTA/fastapi-nextjs-template | Historical source of the initial repo layout |
 
 ---
 
@@ -206,7 +208,7 @@ lumo-dashboard/
 ## 9. Implementation Phases
 
 ### Phase 1 — MVP (3-4 days)
-- [ ] Create repo from fastapi-nextjs-template
+- [x] Initialize repo from FastAPI/Next.js scaffold (completed)
 - [ ] Backend: arm status + basic move + emergency stop
 - [ ] Backend: camera frame endpoint
 - [ ] Frontend: Status bar + joint readout (polling, not WS yet)

@@ -26,6 +26,6 @@ COPY backend/ ./backend/
 ENV PYTHONPATH=/app/backend
 ENV PATH="/app/.venv/bin:$PATH"
 
-EXPOSE 8000
+EXPOSE 8002
 
-CMD ["uvicorn", "app_template.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "lumo_dashboard.main:app", "--host", "0.0.0.0", "--port", "8002"]

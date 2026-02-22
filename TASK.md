@@ -1,23 +1,27 @@
-# Lumo Dashboard — Build Task
+# Lumo Dashboard — Implementation Brief
 
-## Your Goal
-Build a fully functional real-time robot arm + camera dashboard web app.
-Run it, verify it works, take a screenshot proof.
+Use `CLAUDE.md` as the primary project guide. This file captures the concrete delivery target for the dashboard build and verification.
 
-## Hardware Reality
+## Objective
+
+Deliver a working real-time robot arm + camera dashboard web app, run it locally on the target device, and capture proof that the camera/dashboard endpoints are serving correctly.
+
+## Current Hardware Reality
 - **Camera:** ✅ IMX219 CSI stereo camera, CONNECTED, working
   - GStreamer pipeline (NOT OpenCV V4L2 — that returns broken Bayer frames)
   - Pipeline: `nvarguscamerasrc → nvvidconv → BGR → appsink`
   - Reference: `backend/camera_service_reference.py` (production-ready, copy and use it)
 - **Arm:** ❌ NOT connected — handle gracefully (show "Arm Offline" in UI, all arm endpoints return `{"connected": false}`)
 
-## Full Spec
-Read `SPEC.md` for full details. Summary below.
+## Full Specification
 
-## What to Build
+See `SPEC.md` for architecture and phase details. The requirements below are the implementation baseline for this task.
+
+## Required Implementation
 
 ### Backend (FastAPI, port 8002)
-Rename `app_template` → `lumo_dashboard` package. Add:
+
+Use the existing `lumo_dashboard` package. The backend should expose:
 
 **`backend/lumo_dashboard/drivers/camera_driver.py`**
 - Copy `camera_service_reference.py` as base
@@ -58,8 +62,8 @@ Use `psutil` for system stats. GPU temp from `/sys/devices/virtual/thermal/therm
 - Start camera service on startup
 
 ### Frontend (Next.js, served from FastAPI)
-Build static export (`next build && next export` or `next build` with static output).
-FastAPI serves the `out/` directory at `/`.
+
+Build a static export (or other static output compatible with the current FastAPI file serving setup). FastAPI serves the frontend build from `frontend/out` at `/`.
 
 **Layout — single page dashboard:**
 ```
@@ -100,7 +104,7 @@ gripper        --°  [OFFLINE]
 ```
 Gray/muted styling. Not an error — just "not connected yet."
 
-## Running It
+## Local Run / Verification
 
 **Backend:**
 ```bash
@@ -117,7 +121,7 @@ npm run build
 # Copy output to where FastAPI serves static files
 ```
 
-**Note on GStreamer + Python:**
+**Note on GStreamer + Python**
 The camera service uses PyGObject (gi). Make sure to run in an environment where it's available:
 ```python
 import gi
@@ -139,9 +143,11 @@ pipeline_str = (
 )
 ```
 
-## Proof Required
+## Acceptance Evidence
+
+Collect proof that the system is serving:
 1. Start the server
-2. Take a screenshot of the running dashboard: `gnome-screenshot` or use Python:
+2. Capture an image from the running dashboard/camera path: `gnome-screenshot` or use Python:
 ```python
 import subprocess
 subprocess.run(['python3', '-c', '''
@@ -153,7 +159,7 @@ with open("/tmp/dashboard_proof.jpg", "wb") as f:
 print("Frame saved to /tmp/dashboard_proof.jpg")
 '''])
 ```
-Also capture the full webpage via:
+Also capture the full webpage (or equivalent HTML fetch evidence) via:
 ```bash
 chromium-browser --headless --screenshot=/tmp/dashboard_screenshot.png --window-size=1280,800 http://localhost:8002 2>/dev/null || \
 python3 -c "
@@ -164,8 +170,10 @@ print('First 200 chars:', html[:200])
 "
 ```
 
-## When Done
-Notify Beluga:
+## Completion Notification (Optional / Environment-Specific)
+
+If you are working in the Beluga OpenClaw environment, send a completion event:
+
 ```bash
 openclaw system event --text "lumo-dashboard DONE: dashboard running at http://localhost:8002. Camera streaming live. Screenshot at /tmp/dashboard_screenshot.png" --mode now
 ```

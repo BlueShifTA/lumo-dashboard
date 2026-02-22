@@ -7,13 +7,13 @@ services:
       context: .
       dockerfile: devops/backend.dockerfile
     ports:
-      - "8000:8000"
+      - "8002:8002"
     environment:
       - DEBUG=true
       - API_HOST=0.0.0.0
-      - API_PORT=8000
+      - API_PORT=8002
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -25,7 +25,7 @@ services:
       context: .
       dockerfile: devops/frontend.dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8002
     ports:
       - "3000:3000"
     depends_on:

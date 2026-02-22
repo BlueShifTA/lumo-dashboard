@@ -17,7 +17,7 @@ repos:
 
       - id: mypy
         name: mypy
-        entry: bash -c "PYTHONPATH=backend uv run mypy backend/app_template"
+        entry: bash -c "PYTHONPATH=backend uv run mypy backend/lumo_dashboard"
         language: system
         pass_filenames: false
 
