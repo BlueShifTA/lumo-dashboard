@@ -14,8 +14,6 @@ from lumo_dashboard.api.arm import router as arm_router
 from lumo_dashboard.api.ws import router as ws_router
 from lumo_dashboard.api.processes import router as processes_router
 from lumo_dashboard.api.config import router as config_router
-from lumo_dashboard.api.health import router as health_router
-from lumo_dashboard.core.health_db import init_db
 from lumo_dashboard.drivers.camera_driver import get_camera
 
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +24,6 @@ FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend" / "out"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
     log.info("Starting camera...")
     get_camera().start()
     log.info("Camera started")
@@ -50,7 +47,6 @@ app.include_router(arm_router, prefix="/api")
 app.include_router(ws_router)
 app.include_router(processes_router, prefix="/api")
 app.include_router(config_router, prefix="/api")
-app.include_router(health_router, prefix="/api")
 
 
 @app.get("/health")

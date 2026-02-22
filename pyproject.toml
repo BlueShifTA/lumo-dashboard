@@ -10,8 +10,6 @@ dependencies = [
     "pydantic-settings",
     "uvicorn[standard]",
     "python-dotenv",
-    "garth",
-    "anthropic",
 ]
 
 [dependency-groups]

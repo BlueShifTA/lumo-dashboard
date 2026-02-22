@@ -25,7 +25,6 @@ const NAV = [
   { id: "arms", icon: "🦾", label: "Arms" },
   { id: "operations", icon: "🎮", label: "Operations" },
   { id: "config", icon: "⚙️", label: "Config" },
-  { id: "health", icon: "❤️", label: "Health" },
 ];
 
 function StatusDot({ connected, label }) {
@@ -101,18 +100,6 @@ export default function Dashboard() {
   const [motorAccel, setMotorAccel] = useState(10);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
-
-  // ── Health state ────────────────────────────────────────────────────────────
-  const [healthStatus, setHealthStatus] = useState({ connected: false, last_sync: null, today: null });
-  const [healthHistory, setHealthHistory] = useState([]);
-  const [healthLoginEmail, setHealthLoginEmail] = useState("");
-  const [healthLoginPassword, setHealthLoginPassword] = useState("");
-  const [healthLoginLoading, setHealthLoginLoading] = useState(false);
-  const [healthSyncLoading, setHealthSyncLoading] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatSessionId] = useState(() => Math.random().toString(36).slice(2));
 
   const wsRef = useRef(null);
   const canvasRef = useRef(null);
@@ -234,59 +221,6 @@ export default function Dashboard() {
     const now = Date.now();
     const last = lastSendRef.current[joint] || 0;
     if (now - last >= 120) { lastSendRef.current[joint] = now; moveJoint(joint, value, false); }
-  }
-
-  // ── Health polling ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    function pollHealth() {
-      fetch("/api/health/status").then(r => r.json()).then(d => setHealthStatus(d)).catch(() => {});
-      fetch("/api/health/history?days=7").then(r => r.json()).then(d => setHealthHistory(Array.isArray(d) ? d : [])).catch(() => {});
-    }
-    if (activeTab === "health") { pollHealth(); }
-  }, [activeTab]);
-
-  async function healthLogin() {
-    setHealthLoginLoading(true);
-    try {
-      const r = await fetch("/api/health/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: healthLoginEmail, password: healthLoginPassword }) });
-      const d = await r.json();
-      if (d.success) {
-        setHealthLoginEmail(""); setHealthLoginPassword("");
-        fetch("/api/health/status").then(r2 => r2.json()).then(setHealthStatus).catch(() => {});
-      }
-    } catch {}
-    setHealthLoginLoading(false);
-  }
-
-  async function healthSync() {
-    setHealthSyncLoading(true);
-    try {
-      const r = await fetch("/api/health/sync", { method: "POST" });
-      if (r.ok) {
-        fetch("/api/health/status").then(r2 => r2.json()).then(setHealthStatus).catch(() => {});
-        fetch("/api/health/history?days=7").then(r2 => r2.json()).then(d => setHealthHistory(Array.isArray(d) ? d : [])).catch(() => {});
-      }
-    } catch {}
-    setHealthSyncLoading(false);
-  }
-
-  const chatEndRef = useRef(null);
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages]);
-
-  async function sendChatMessage() {
-    const msg = chatInput.trim();
-    if (!msg || chatLoading) return;
-    setChatInput("");
-    setChatMessages(m => [...m, { role: "user", content: msg }]);
-    setChatLoading(true);
-    try {
-      const r = await fetch("/api/health/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: msg, session_id: chatSessionId }) });
-      const d = await r.json();
-      setChatMessages(m => [...m, { role: "assistant", content: d.response, tokens_used: d.tokens_used }]);
-    } catch {
-      setChatMessages(m => [...m, { role: "assistant", content: "Error — could not reach health chat." }]);
-    }
-    setChatLoading(false);
   }
 
   // ── Derived state ──────────────────────────────────────────────────────────
@@ -624,190 +558,6 @@ export default function Dashboard() {
                     style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid var(--border)", background: leaderPort === followerPort ? "#111" : "#0d2a1a", color: leaderPort === followerPort ? "#555" : "var(--success)", cursor: leaderPort === followerPort ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600 }}
                   >
                     Apply
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          {/* HEALTH TAB                                                      */}
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          {activeTab === "health" && (
-            <div style={{ display: "flex", gap: 16, height: "calc(100vh - 120px)", overflow: "hidden" }}>
-
-              {/* ── Left: Metrics Panel ──────────────────────────────────── */}
-              <div style={{ width: 340, flexShrink: 0, display: "flex", flexDirection: "column", gap: 12, overflowY: "auto" }}>
-
-                {/* Header */}
-                <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: healthStatus.connected ? 10 : 0 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700 }}>❤️ Health</span>
-                    <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 10, background: healthStatus.connected ? "#0d2a1a" : "#1a1a1a", color: healthStatus.connected ? "var(--success)" : "#555", border: `1px solid ${healthStatus.connected ? "#1a4a2a" : "#333"}` }}>
-                      {healthStatus.connected ? "● Connected" : "○ Not Connected"}
-                    </span>
-                  </div>
-
-                  {/* Login form when not connected */}
-                  {!healthStatus.connected && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-                      <input
-                        type="email"
-                        placeholder="Garmin email"
-                        value={healthLoginEmail}
-                        onChange={e => setHealthLoginEmail(e.target.value)}
-                        style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "#111", color: "var(--text)", fontSize: 13 }}
-                      />
-                      <input
-                        type="password"
-                        placeholder="Password"
-                        value={healthLoginPassword}
-                        onChange={e => setHealthLoginPassword(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && healthLogin()}
-                        style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "#111", color: "var(--text)", fontSize: 13 }}
-                      />
-                      <button
-                        onClick={healthLogin}
-                        disabled={healthLoginLoading || !healthLoginEmail || !healthLoginPassword}
-                        style={{ padding: "9px", borderRadius: 8, border: "1px solid var(--border)", background: "#0d2a1a", color: "var(--success)", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: healthLoginLoading ? 0.6 : 1 }}
-                      >
-                        {healthLoginLoading ? "Connecting..." : "Connect Garmin"}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Sync button when connected */}
-                  {healthStatus.connected && (
-                    <button
-                      onClick={healthSync}
-                      disabled={healthSyncLoading}
-                      style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "#111", color: healthSyncLoading ? "#555" : "var(--text)", cursor: healthSyncLoading ? "wait" : "pointer", fontSize: 13 }}
-                    >
-                      {healthSyncLoading ? "Syncing..." : "↻ Sync Now"}
-                    </button>
-                  )}
-                </div>
-
-                {/* Today's stat cards */}
-                {healthStatus.today && (() => {
-                  const t = healthStatus.today;
-                  const cards = [
-                    {
-                      icon: "😴", label: "Sleep Score", value: t.sleep_score, unit: "",
-                      pct: t.sleep_score != null ? Math.min(100, t.sleep_score) : null,
-                      color: t.sleep_score >= 70 ? "var(--success)" : t.sleep_score >= 50 ? "#f59e0b" : "#ef4444",
-                    },
-                    {
-                      icon: "💓", label: "HRV Avg", value: t.hrv_avg, unit: " ms",
-                      pct: t.hrv_avg != null ? Math.min(100, (t.hrv_avg / 100) * 100) : null,
-                      color: t.hrv_avg >= 50 ? "var(--success)" : t.hrv_avg >= 35 ? "#f59e0b" : "#ef4444",
-                    },
-                    {
-                      icon: "⚡", label: "Body Battery", value: t.body_battery_max, unit: "%",
-                      pct: t.body_battery_max != null ? Math.min(100, t.body_battery_max) : null,
-                      color: t.body_battery_max >= 60 ? "var(--success)" : t.body_battery_max >= 30 ? "#f59e0b" : "#ef4444",
-                    },
-                    {
-                      icon: "🧘", label: "Stress Avg", value: t.stress_avg, unit: "",
-                      pct: t.stress_avg != null ? Math.min(100, t.stress_avg) : null,
-                      color: t.stress_avg <= 25 ? "var(--success)" : t.stress_avg <= 50 ? "#f59e0b" : "#ef4444",
-                    },
-                    {
-                      icon: "👟", label: "Steps", value: t.steps, unit: "",
-                      pct: t.steps != null ? Math.min(100, (t.steps / 10000) * 100) : null,
-                      color: t.steps >= 8000 ? "var(--success)" : t.steps >= 5000 ? "#f59e0b" : "#ef4444",
-                    },
-                  ];
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {cards.map(card => (
-                        <div key={card.label} style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{card.icon} {card.label}</span>
-                            <span style={{ fontFamily: "monospace", fontSize: 14, color: card.value != null ? card.color : "#555", fontWeight: 600 }}>
-                              {card.value != null ? `${typeof card.value === "number" && card.label !== "Steps" ? card.value.toFixed(0) : card.value}${card.unit}` : "--"}
-                            </span>
-                          </div>
-                          <div style={{ height: 4, borderRadius: 2, background: "#1a1a1a" }}>
-                            {card.pct != null && (
-                              <div style={{ height: 4, borderRadius: 2, background: card.color, width: `${Math.max(0, Math.min(100, card.pct))}%`, maxWidth: "100%", transition: "width 0.4s ease" }} />
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-
-                {/* 7-day history list */}
-                {healthHistory.length > 0 && (
-                  <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
-                    <h3 style={{ margin: "0 0 10px 0", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1 }}>7-Day History</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      {healthHistory.map(row => {
-                        const d = new Date(row.date + "T00:00:00");
-                        const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                        return (
-                          <div key={row.date} style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "monospace", padding: "3px 0", borderBottom: "1px solid #1a1a1a" }}>
-                            {label} · 😴{row.sleep_score ?? "--"} · ⚡{row.body_battery_max ?? "--"} · 💓{row.hrv_avg ?? "--"}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Right: Chat Panel ─────────────────────────────────────── */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-
-                {/* Message list */}
-                <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                  {chatMessages.length === 0 && (
-                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center" }}>Ask me about your sleep, energy, stress, or activity</span>
-                    </div>
-                  )}
-                  {chatMessages.map((msg, i) => (
-                    <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                      <div style={{
-                        maxWidth: "80%", padding: "10px 14px", borderRadius: 10, fontSize: 13, lineHeight: 1.5,
-                        background: msg.role === "user" ? "#0d2a1a" : "var(--card-bg)",
-                        border: `1px solid ${msg.role === "user" ? "var(--primary)" : "var(--border)"}`,
-                        color: "var(--text)",
-                        whiteSpace: "pre-wrap",
-                      }}>
-                        {msg.content}
-                      </div>
-                      {msg.role === "assistant" && msg.tokens_used && (
-                        <span style={{ fontSize: 10, color: "#444", marginTop: 2 }}>{msg.tokens_used} tokens</span>
-                      )}
-                    </div>
-                  ))}
-                  {chatLoading && (
-                    <div style={{ display: "flex", alignItems: "flex-start" }}>
-                      <div style={{ padding: "10px 14px", borderRadius: 10, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text-muted)" }}>...</div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-
-                {/* Input area */}
-                <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)", display: "flex", gap: 8 }}>
-                  <input
-                    value={chatInput}
-                    onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendChatMessage()}
-                    placeholder="Ask about your health data..."
-                    disabled={chatLoading}
-                    style={{ flex: 1, padding: "9px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "#111", color: "var(--text)", fontSize: 13, outline: "none" }}
-                  />
-                  <button
-                    onClick={sendChatMessage}
-                    disabled={chatLoading || !chatInput.trim()}
-                    style={{ padding: "9px 18px", borderRadius: 8, border: "1px solid var(--border)", background: chatLoading || !chatInput.trim() ? "#111" : "#0d2a1a", color: chatLoading || !chatInput.trim() ? "#555" : "var(--success)", cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600 }}
-                  >
-                    Send
                   </button>
                 </div>
               </div>
