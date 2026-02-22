@@ -21,6 +21,12 @@ repos:
         language: system
         pass_filenames: false
 
+      - id: pyright
+        name: pyright
+        entry: bash -c "PYTHONPATH=backend uv run pyright backend/lumo_dashboard"
+        language: system
+        pass_filenames: false
+
       - id: frontend-eslint-fix
         name: frontend eslint fix
         entry: bash -c "cd frontend && npm run lint -- --fix"
@@ -32,3 +38,15 @@ repos:
         entry: bash -c "cd frontend && npm run lint"
         language: system
         pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: mixed-line-ending

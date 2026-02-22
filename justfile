@@ -68,6 +68,7 @@ run-ci:
   uv run ruff format --check backend
   uv run ruff check backend
   PYTHONPATH=backend uv run mypy backend/lumo_dashboard
+  PYTHONPATH=backend uv run pyright backend/lumo_dashboard
   cd frontend && npm ci
   cd frontend && npm run lint
   cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:8002 npm run build
@@ -85,6 +86,21 @@ lint:
   uv run pre-commit run --config devops/.pre-commit-config.yaml --all-files
 
 [group('lint')]
+[doc("Run Ruff lint checks on backend code")]
+ruff-lint:
+  uv run ruff check backend
+
+[group('lint')]
+[doc("Check backend formatting with Ruff")]
+ruff-format-check:
+  uv run ruff format --check backend
+
+[group('lint')]
+[doc("Format backend code with Ruff")]
+ruff-format-fix:
+  uv run ruff format backend
+
+[group('lint')]
 format:
   uv run ruff format backend
   cd frontend && npm run lint -- --fix || true
@@ -92,6 +108,21 @@ format:
 [group('lint')]
 typecheck:
   PYTHONPATH=backend uv run mypy backend/lumo_dashboard
+
+[group('lint')]
+[doc("Run Pyright type checking on backend code")]
+pyright:
+  PYTHONPATH=backend uv run pyright backend/lumo_dashboard
+
+[group('lint')]
+[doc("Run frontend ESLint")]
+frontend-lint:
+  cd frontend && npm run lint
+
+[group('lint')]
+[doc("Run frontend ESLint with fixes")]
+frontend-lint-fix:
+  cd frontend && npm run lint -- --fix
 
 # ─────────────────────────────────────────────────────────────
 # Docker
@@ -166,3 +197,18 @@ clean:
   rm -rf .venv .mypy_cache .ruff_cache .pytest_cache __pycache__ .coverage coverage.xml
   rm -rf frontend/.next frontend/node_modules
   find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+
+[group('run')]
+[doc("Build Next.js static export for FastAPI to serve")]
+build-frontend:
+  cd frontend && NEXT_PUBLIC_API_BASE_URL= npm run build
+
+[group('run')]
+[doc("Run production-style backend on port 8002 (serves frontend/out if built)")]
+run-prod:
+  PYTHONPATH=backend uv run uvicorn lumo_dashboard.main:app --host 0.0.0.0 --port 8002
+
+[group('util')]
+[doc("Show production service status")]
+service-status:
+  systemctl status --no-pager lumo-dashboard.service || true
