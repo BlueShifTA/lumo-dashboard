@@ -3,11 +3,12 @@ name = "lumo-dashboard"
 version = "0.1.0"
 description = "Lumo Dashboard backend and frontend services for arm and camera monitoring"
 readme = "README.md"
-requires-python = "==3.13.*"
+requires-python = ">=3.10,<3.11"
 dependencies = [
     "fastapi",
     "pydantic>=2.0",
     "pydantic-settings",
+    "psutil",
     "uvicorn[standard]",
     "python-dotenv",
 ]
@@ -59,17 +60,23 @@ skip_empty = true
 
 [tool.ruff]
 line-length = 88
+target-version = "py310"
 src = ["backend"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "TID"]
 ignore = ["E501"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
 
 [tool.mypy]
 strict = true
 files = ["backend/lumo_dashboard"]
 mypy_path = ["backend/stubs"]
+python_version = "3.10"
 
 [tool.pyright]
 include = ["backend/lumo_dashboard"]
 stubPath = "backend/stubs"
+pythonVersion = "3.10"

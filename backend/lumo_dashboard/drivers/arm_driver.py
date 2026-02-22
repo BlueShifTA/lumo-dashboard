@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
-import sys
 import threading
 import time
 from collections.abc import Mapping
-from typing import Protocol, TypedDict
+from importlib.util import find_spec
+from typing import Protocol
+
+from typing_extensions import TypedDict
 
 log = logging.getLogger(__name__)
 
@@ -20,12 +22,12 @@ JOINT_NAMES = [
     "gripper",
 ]
 
-# Add lerobot to path
-sys.path.insert(0, "/home/nvidia/Project/lerobot/src")
-
 try:
-    LEROBOT_AVAILABLE = True
-    log.info("LeRobot imports OK")
+    LEROBOT_AVAILABLE = find_spec("lerobot") is not None
+    if LEROBOT_AVAILABLE:
+        log.info("LeRobot package is available")
+    else:
+        log.warning("LeRobot package not available")
 except Exception as e:
     LEROBOT_AVAILABLE = False
     log.warning(f"LeRobot not available: {e}")

@@ -67,6 +67,7 @@ run-ci:
     --cov-fail-under=80
   uv run ruff format --check backend
   uv run ruff check backend
+  uv run python scripts/check_no_sys_path_mutation.py
   PYTHONPATH=backend uv run mypy backend/lumo_dashboard
   PYTHONPATH=backend uv run pyright backend/lumo_dashboard
   cd frontend && npm ci
@@ -76,6 +77,11 @@ run-ci:
 [group('test')]
 [doc("Alias for run-ci")]
 ci-local: run-ci
+
+[group('test')]
+[doc("Import backend app module to catch Python/runtime compatibility regressions")]
+backend-import-smoke:
+  PYTHONPATH=backend uv run python -c "import lumo_dashboard.main"
 
 # ─────────────────────────────────────────────────────────────
 # Linting & Formatting
@@ -89,6 +95,11 @@ lint:
 [doc("Run Ruff lint checks on backend code")]
 ruff-lint:
   uv run ruff check backend
+
+[group('lint')]
+[doc("Reject sys.path.insert/append/extend path hacks in Python source")]
+check-no-sys-path:
+  uv run python scripts/check_no_sys_path_mutation.py
 
 [group('lint')]
 [doc("Check backend formatting with Ruff")]

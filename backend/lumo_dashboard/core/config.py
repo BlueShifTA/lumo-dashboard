@@ -1,7 +1,8 @@
 """Shared runtime config — ports and settings adjustable from the dashboard."""
 
 import threading
-from typing import TypedDict
+
+from typing_extensions import TypedDict
 
 _lock = threading.Lock()
 

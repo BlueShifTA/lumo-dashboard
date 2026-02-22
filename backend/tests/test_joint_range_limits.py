@@ -6,7 +6,6 @@ No real hardware required. Pure mock tests.
 """
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -91,7 +90,6 @@ def _setup(cal_data=None):
     for m in list(sys.modules):
         if "lumo_dashboard" in m:
             del sys.modules[m]
-    sys.path.insert(0, str(Path(__file__).parent.parent))
 
     bus = MagicMock()
     bus.sync_read.return_value = dict(CURRENT_POSITIONS)
@@ -147,7 +145,6 @@ class TestCalibrationLimitsExact:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
 
     MOCK_MODULES = {
         "lerobot": MagicMock(),
@@ -278,7 +275,6 @@ class TestFrontendSliderBoundsConsistency:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
 
         with (
             patch.dict(
@@ -327,7 +323,6 @@ class TestBulkMoveDisabled:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
 
         with patch.dict(
             "sys.modules",
@@ -349,7 +344,6 @@ class TestBulkMoveDisabled:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
 
         with patch.dict(
             "sys.modules",

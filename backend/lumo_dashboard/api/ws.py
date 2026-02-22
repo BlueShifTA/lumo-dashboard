@@ -2,11 +2,11 @@
 
 import asyncio
 import json
-from datetime import UTC, datetime
-from typing import TypedDict
+from datetime import datetime, timezone
 
 import psutil
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from typing_extensions import TypedDict
 
 from lumo_dashboard.drivers.arm_driver import SingleArmStatus, get_arm
 from lumo_dashboard.drivers.camera_driver import get_camera
@@ -49,7 +49,7 @@ def _build_telemetry() -> TelemetryPayload:
     dual = get_arm().get_dual_status()
     cam = get_camera().status()
     return {
-        "ts": datetime.now(UTC).isoformat(),
+        "ts": datetime.now(timezone.utc).isoformat(),
         "arm": {
             # legacy single-arm field (follower) for backwards compat
             "connected": dual["follower"]["connected"],

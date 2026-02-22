@@ -18,7 +18,6 @@ Critical invariants tested:
 import json
 import threading
 import time
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -119,7 +118,6 @@ def _make_monitor(arm_type="follower", connected=False, mock_bus=None):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
 
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         from lumo_dashboard.drivers.arm_driver import SingleArmMonitor
 
     monitor = SingleArmMonitor("test", "/dev/ttyACM0", arm_type)
@@ -166,7 +164,6 @@ class TestConnectSafety:
             for m in list(sys.modules):
                 if "lumo_dashboard" in m:
                     del sys.modules[m]
-            sys.path.insert(0, str(Path(__file__).parent.parent))
 
             with (
                 patch("pathlib.Path.exists", return_value=True),
@@ -238,7 +235,6 @@ class TestConnectSafety:
             for m in list(sys.modules):
                 if "lumo_dashboard" in m:
                     del sys.modules[m]
-            sys.path.insert(0, str(Path(__file__).parent.parent))
 
             with (
                 patch("pathlib.Path.exists", return_value=True),
@@ -263,7 +259,6 @@ class TestDisconnectSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
 
         with patch.dict(
             "sys.modules",
@@ -320,7 +315,6 @@ class TestReadSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -399,7 +393,6 @@ class TestJointMoveSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -432,7 +425,6 @@ class TestJointMoveSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -462,7 +454,6 @@ class TestJointMoveSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -497,7 +488,6 @@ class TestJointMoveSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -539,7 +529,6 @@ class TestJointMoveSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -566,7 +555,6 @@ class TestJointMoveSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -627,7 +615,6 @@ class TestAngleClamping:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
 
         bus = make_mock_bus()
 
@@ -684,7 +671,6 @@ class TestPortSwapSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -754,7 +740,6 @@ class TestThreadSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -803,7 +788,6 @@ class TestThreadSafety:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -838,7 +822,6 @@ class TestCalibrationEndpoint:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {
@@ -880,7 +863,6 @@ class TestCalibrationEndpoint:
         for m in list(sys.modules):
             if "lumo_dashboard" in m:
                 del sys.modules[m]
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         with patch.dict(
             "sys.modules",
             {

@@ -27,6 +27,12 @@ repos:
         language: system
         pass_filenames: false
 
+      - id: no-sys-path-mutation
+        name: no sys.path mutation
+        entry: uv run python scripts/check_no_sys_path_mutation.py
+        language: system
+        pass_filenames: false
+
       - id: frontend-eslint-fix
         name: frontend eslint fix
         entry: bash -c "cd frontend && npm run lint -- --fix"

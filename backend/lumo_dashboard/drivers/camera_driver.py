@@ -5,11 +5,15 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Protocol, TypedDict, cast
+from importlib.machinery import PathFinder
+from importlib.util import module_from_spec
+from types import ModuleType
+from typing import Protocol, cast
 
 import cv2
 import numpy as np
 import numpy.typing as npt
+from typing_extensions import TypedDict
 
 log = logging.getLogger(__name__)
 Gst: object | None = None
@@ -88,6 +92,10 @@ class _GstModuleProtocol(Protocol):
     def parse_launch(self, pipeline: str) -> _GstPipelineProtocol: ...
 
 
+class _GiModuleProtocol(Protocol):
+    def require_version(self, namespace: str, version: str) -> None: ...
+
+
 class CameraStatus(TypedDict):
     connected: bool
     gstreamer: bool
@@ -95,6 +103,23 @@ class CameraStatus(TypedDict):
     height: int
     fps: int
     mode: str
+
+
+def _import_gi_from_system_dist_packages() -> _GiModuleProtocol:
+    """Load gi from Jetson system dist-packages without mutating sys.path."""
+    import sys
+
+    search_path = "/usr/lib/python3/dist-packages"
+    spec = PathFinder.find_spec("gi", [search_path])
+    if spec is None or spec.loader is None:
+        raise ModuleNotFoundError("gi not found in system dist-packages")
+
+    module = module_from_spec(spec)
+    if not isinstance(module, ModuleType):
+        raise ModuleNotFoundError("gi module spec did not produce a module")
+    sys.modules.setdefault("gi", module)
+    spec.loader.exec_module(module)
+    return cast(_GiModuleProtocol, module)
 
 
 try:
@@ -108,16 +133,12 @@ try:
     gst_imported.init(None)
     GST_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
-    # gi not in this Python env — try system dist-packages (Jetson)
-    # Insert temporarily, then remove to avoid contaminating numpy ABI
-    import sys
-
-    _gi_path = "/usr/lib/python3/dist-packages"
-    sys.path.insert(0, _gi_path)
+    # gi not in this Python env — try system dist-packages (Jetson) without
+    # mutating sys.path.
     try:
-        import gi
+        gi_mod = _import_gi_from_system_dist_packages()
 
-        gi.require_version("Gst", "1.0")
+        gi_mod.require_version("Gst", "1.0")
         from gi.repository import Gst as _GstImported
 
         gst_imported = cast(_GstModuleProtocol, _GstImported)
@@ -128,12 +149,6 @@ except (ImportError, ModuleNotFoundError):
     except Exception as e2:
         log.warning(f"GStreamer not available: {e2}")
         GST_AVAILABLE = False
-    finally:
-        # Remove immediately — don't let system packages bleed into lerobot imports
-        try:
-            sys.path.remove(_gi_path)
-        except ValueError:
-            pass
 except Exception as e:
     log.warning(f"GStreamer not available: {e}")
     GST_AVAILABLE = False
