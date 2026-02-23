@@ -1,0 +1,135 @@
+.root {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, sans-serif;
+}
+
+.topBar {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hamburger {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 20px;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.brand {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.topRight {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--card-bg);
+  transition: width 0.2s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.navItemActive {
+  background: #0d2a1a;
+  border-left: 3px solid var(--success);
+  color: var(--success);
+  font-weight: 600;
+}
+
+.navItemInactive {
+  border-left: 3px solid transparent;
+}
+
+.navIcon {
+  font-size: 17px;
+}
+
+.mainContent {
+  flex: 1;
+  padding: 16px;
+  overflow: auto;
+}
+
+.metric {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.metricValue {
+  color: var(--text);
+}
+
+@media (max-width: 1024px) {
+  .body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    flex-direction: row;
+    padding-top: 0;
+    overflow-x: auto;
+  }
+
+  .navItem {
+    width: auto;
+    min-width: 90px;
+    justify-content: center;
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+}

@@ -13,10 +13,13 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals"),
   {
+    ignores: [".next/**", "out/**", "src/generated/**", "src/lib/api/generated/**"],
+  },
+  {
     plugins: {
       import: importPlugin,
     },
-    files: ["**/*.{js,jsx,mjs,cjs}"],
+    files: ["**/*.{js,jsx,ts,tsx,mjs,cjs}"],
     rules: {
       "import/first": "error",
       "no-restricted-imports": [
@@ -33,7 +36,7 @@ const eslintConfig = [
     },
   },
   {
-    files: ["app/layout.js"],
+    files: ["app/layout.tsx"],
     rules: {
       "no-restricted-imports": [
         "error",

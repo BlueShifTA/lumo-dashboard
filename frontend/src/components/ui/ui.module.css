@@ -1,0 +1,167 @@
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.cardDense {
+  padding: 12px;
+}
+
+.sectionTitle {
+  margin: 0 0 12px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: #111;
+  white-space: nowrap;
+}
+
+.badgeSuccess {
+  background: #0d2a1a;
+  color: var(--success);
+  border-color: #1a4a2a;
+}
+
+.badgeDanger {
+  background: #1a0d0d;
+  color: var(--danger);
+  border-color: #4a1a1a;
+}
+
+.badgeWarning {
+  background: #1a1200;
+  color: #f59e0b;
+  border-color: #5c4100;
+}
+
+.badgeInfo {
+  background: #0d1a2a;
+  color: #60a5fa;
+  border-color: #1a3a6a;
+}
+
+.badgeMuted {
+  color: #555;
+  border-color: #333;
+  background: #1a1a1a;
+}
+
+.statusDot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusDotIndicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #555;
+  display: inline-block;
+}
+
+.statusDotIndicatorActive {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+.statusDotLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.statusDotLabelActive {
+  color: var(--text);
+}
+
+.button {
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: #111;
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 13px;
+  transition: opacity 0.1s;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.buttonFull {
+  width: 100%;
+}
+
+.buttonDanger {
+  border: 2px solid var(--danger);
+  background: #1a0505;
+  color: var(--danger);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.buttonSuccess {
+  background: #0d2a1a;
+  color: var(--success);
+}
+
+.buttonWarning {
+  background: #1a1200;
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.buttonXs {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+.buttonSm {
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 6px;
+}
+
+.buttonMd {
+  font-size: 14px;
+  padding: 10px 12px;
+}
+
+.buttonStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metricChip {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.metricChip b {
+  color: var(--text);
+}
+
+.inlineDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #555;
+  display: inline-block;
+  flex-shrink: 0;
+}

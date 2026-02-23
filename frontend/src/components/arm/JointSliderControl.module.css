@@ -1,0 +1,40 @@
+.sliderRow {
+  margin-bottom: 10px;
+}
+
+.sliderHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.sliderValue {
+  font-family: monospace;
+  color: var(--primary);
+}
+
+.sliderValueMuted {
+  color: #555;
+}
+
+.sliderValueDragging {
+  color: #f59e0b;
+}
+
+.range {
+  width: 100%;
+}
+
+.rangeDisabled {
+  opacity: 0.4;
+}
+
+.limits {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #444;
+  margin-top: 1px;
+}

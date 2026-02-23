@@ -1,0 +1,72 @@
+.row {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.rowHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.labelMuted {
+  color: var(--text-muted);
+}
+
+.valueWrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.value {
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--primary);
+  min-width: 56px;
+  text-align: right;
+}
+
+.valueMuted {
+  color: var(--text-muted);
+}
+
+.track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: #1a1a1a;
+}
+
+.marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--primary);
+  transform: translateX(-50%);
+}
+
+.markerMuted {
+  background: #333;
+}
+
+.limits {
+  display: flex;
+  justify-content: space-between;
+  position: absolute;
+  width: 100%;
+  top: 6px;
+  font-size: 9px;
+  color: #333;
+}

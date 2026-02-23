@@ -131,6 +131,11 @@ frontend-lint:
   cd frontend && npm run lint
 
 [group('lint')]
+[doc("Run frontend TypeScript type checking")]
+frontend-typecheck:
+  cd frontend && npm run typecheck
+
+[group('lint')]
 [doc("Run frontend ESLint with fixes")]
 frontend-lint-fix:
   cd frontend && npm run lint -- --fix
@@ -168,6 +173,11 @@ docker-prod:
 [doc("Export OpenAPI schema from running backend")]
 export-openapi:
   curl -s http://127.0.0.1:8002/openapi.json | python -m json.tool > openapi.json
+
+[group('util')]
+[doc("Generate frontend API client/types from FastAPI OpenAPI schema")]
+generate-frontend-types:
+  cd frontend && npm run api
 
 [group('util')]
 [doc("Create and push git tag: `just tag 0.0.1` or auto-increment with `just tag`")]
